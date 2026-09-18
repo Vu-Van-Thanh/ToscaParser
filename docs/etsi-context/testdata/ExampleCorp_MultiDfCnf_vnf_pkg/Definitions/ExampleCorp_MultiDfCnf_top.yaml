@@ -1,0 +1,38 @@
+# TOP-LEVEL service template.
+#
+# [ETSI NORMATIVE] SOL001 V5.4.1 clause 6.11.2, "Single or multiple deployment flavour design with
+# two levels of service templates": the VNFD "shall be implemented as one top-level service template
+# and one or multiple lower level service templates, where each lower level service template
+# represents a deployment flavour". The lower level templates shall be named in Other-Definitions
+# of the TOSCA.meta file, which they are.
+#
+# This template holds one abstract VNF node template carrying the `substitute` directive. Each lower
+# level template declares substitution_mappings with a substitution_filter selecting its own
+# flavour_id, so a consumer picks a flavour by choosing which lower level template substitutes here.
+#
+# Note for the parser: this file has a topology_template but is NOT itself a deployment flavour.
+# What distinguishes it is that it is the Entry-Definitions file while other files in the package
+# also carry topologies.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: >-
+  Top-level service template of the ExampleCorp MultiDfCnf VNF. Deployment flavours "simple" and
+  "complex" live in the two lower level templates named in Other-Definitions.
+
+imports:
+  - ExampleCorp_MultiDfCnf_vnf_node_type.yaml
+
+topology_template:
+
+  node_templates:
+
+    MultiDfCnf:
+      type: ExampleCorp.MultiDfCnf.1_0
+      # [ETSI NORMATIVE] SOL001 clause 6.11.2 d): the top-level VNF node template "may include a
+      # substitute directive". It adds that "the VNFD consumer shall silently ignore the substitute
+      # directive if explicit directives are not supported".
+      directives: [ substitute ]
+      properties:
+        flavour_id: simple
+        flavour_description: "Selected from a lower level service template"

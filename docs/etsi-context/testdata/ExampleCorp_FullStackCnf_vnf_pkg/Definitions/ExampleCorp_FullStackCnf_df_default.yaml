@@ -1,0 +1,227 @@
+# Every CNF node type the library can bind, in one descriptor.
+#
+# Purpose: this package is a COVERAGE probe, not a happy path. Several of the node types below are
+# bindable but reach no mapper today, so parsing this package correctly means producing empty
+# collections for them. That is the expected result, and the package README records it, so a future
+# change that starts populating them is visible as a diff rather than a surprise.
+#
+# [TOSCA REPRESENTATION] Node types used, with their SOL001 V5.4.1 clauses:
+#   tosca.nodes.nfv.VNF                            6.8.1
+#   tosca.nodes.nfv.Vdu.OsContainerDeployableUnit  6.8.13
+#   tosca.nodes.nfv.Vdu.OsContainer                6.8.12
+#   tosca.nodes.nfv.VduCp                          6.8.8
+#   tosca.nodes.nfv.VduSubCp                       6.8.11
+#   tosca.nodes.nfv.VipCp                          6.8.10
+#   tosca.nodes.nfv.VirtualCp                      6.8.15
+#   tosca.nodes.nfv.VnfVirtualLink                 6.8.9
+#   tosca.nodes.nfv.Vdu.VirtualBlockStorage        6.8.4
+#   tosca.nodes.nfv.Vdu.VirtualObjectStorage       6.8.5
+#   tosca.nodes.nfv.Vdu.VirtualFileStorage         6.8.6
+#   tosca.nodes.nfv.DeployableModule               6.8.16
+#   tosca.nodes.nfv.Certificate                    6.8.19
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: >-
+  VNFD for the ExampleCorp FullStackCnf VNF. Exercises every CNF node type the parser knows,
+  including the ones that currently reach no mapper.
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+node_types:
+  ExampleCorp.FullStackCnf.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 9d4e6f13-8b25-4a70-a1c8-3f5e90d2b647
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: FullStackCnf
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: default
+      flavour_description:
+        type: string
+        default: "Every CNF node type in one flavour"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+
+topology_template:
+
+  substitution_mappings:
+    node_type: ExampleCorp.FullStackCnf.1_0
+    requirements:
+      virtual_link_mgmt: [ AppCp, virtual_link ]
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.FullStackCnf.1_0
+
+    # ---------------------------------------------------------------- the deployable unit
+    AppVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: app-vdu
+        description: "Application tier exercising storage, sub-ports and certificates"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 4
+        mcio_identification_data:
+          name: fullstack-app
+          type: StatefulSet
+      requirements:
+        - container: AppContainer
+        - virtual_storage: AppBlockStorage
+        - virtual_storage: AppObjectStorage
+        - virtual_storage: AppFileStorage
+        - installable_certificate: OamCertificate
+
+    AppContainer:
+      type: tosca.nodes.nfv.Vdu.OsContainer
+      properties:
+        name: app
+        description: "Application container"
+        requested_cpu_resources: 500
+        cpu_resource_limit: 1000
+        requested_memory_resources: 512 MiB
+        memory_resource_limit: 1 GiB
+        requested_ephemeral_storage_resources: 2 GiB
+      artifacts:
+        sw_image:
+          type: tosca.artifacts.nfv.SwImage
+          file: ../Artifacts/Images/app-README.txt
+          properties:
+            name: fullstack-app
+            version: '2.1'
+            container_format: docker
+            size: 220 MiB
+
+    # ---------------------------------------------------------------- connection points
+    #
+    # AppCp is an ordinary VduCp, bound to the VDU and exposed externally through
+    # substitution_mappings (SOL001 clause 6.8.2.8), so it becomes both a VduCpd and a VnfExtCpd.
+    AppCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+        trunk_mode: true
+        protocol:
+          - associated_layer_protocol: ipv4
+      requirements:
+        - virtual_binding: AppVdu
+
+    # A sub connection point riding the trunk port above.
+    # SOL001 clause 6.8.11: VduSubCp derives from VduCp and adds the trunk_binding requirement,
+    # whose occurrences are [1, 1].
+    AppSubCp:
+      type: tosca.nodes.nfv.VduSubCp
+      properties:
+        layer_protocols: [ ipv4 ]
+        segmentation_type: vlan
+        segmentation_id: '101'
+        is_automatic_discovery: false
+      requirements:
+        - virtual_binding: AppVdu
+        - trunk_binding: AppCp
+        - virtual_link: SignallingVl
+
+    # SOL001 clause 6.8.10: a VipCp allocates one or a set of virtual IP addresses. Its `target`
+    # requirement has occurrences [1, UNBOUNDED] and points at VduCp nodes, not at a VDU.
+    AppVipCp:
+      type: tosca.nodes.nfv.VipCp
+      properties:
+        layer_protocols: [ ipv4 ]
+        dedicated_ip_address: false
+        vip_function: high_availability
+      requirements:
+        - target: AppCp
+        - virtual_link: SignallingVl
+
+    # SOL001 clause 6.8.15: a VirtualCp gives access to a number of VNFC instances; its `target`
+    # points at the deployable unit itself.
+    AppVirtualCp:
+      type: tosca.nodes.nfv.VirtualCp
+      properties:
+        layer_protocols: [ ipv4 ]
+        address_pool_name_configurable: false
+      requirements:
+        - target: AppVdu
+        - virtual_link: SignallingVl
+
+    # ---------------------------------------------------------------- internal virtual link
+    SignallingVl:
+      type: tosca.nodes.nfv.VnfVirtualLink
+      properties:
+        connectivity_type:
+          layer_protocols: [ ipv4 ]
+        description: "Signalling plane"
+        test_access: [ passive_monitoring ]
+        vl_profile:
+          max_bitrate_requirements:
+            root: 5000000
+          min_bitrate_requirements:
+            root: 500000
+
+    # ---------------------------------------------------------------- storage
+    #
+    # SOL001 clauses 6.8.4 / 6.8.5 / 6.8.6. Each requires its own data property plus
+    # per_vnfc_instance, which is required:true on all three.
+    AppBlockStorage:
+      type: tosca.nodes.nfv.Vdu.VirtualBlockStorage
+      properties:
+        virtual_block_storage_data:
+          size_of_storage: 10 GiB
+          rdma_enabled: false
+        per_vnfc_instance: true
+
+    AppObjectStorage:
+      type: tosca.nodes.nfv.Vdu.VirtualObjectStorage
+      properties:
+        virtual_object_storage_data:
+          max_size_of_storage: 100 GiB
+        per_vnfc_instance: false
+
+    AppFileStorage:
+      type: tosca.nodes.nfv.Vdu.VirtualFileStorage
+      properties:
+        virtual_file_storage_data:
+          size_of_storage: 20 GiB
+          file_system_protocol: nfs
+        per_vnfc_instance: false
+      requirements:
+        # SOL001 clause 6.8.6: the virtual_link requirement has occurrences [1, 1].
+        - virtual_link: SignallingVl
+
+    # ---------------------------------------------------------------- optional VDUs, certificates
+    #
+    # SOL001 clause 6.8.16: a DeployableModule describes a set of optional VDUs; its `member`
+    # requirement has occurrences [1, UNBOUNDED].
+    OptionalModule:
+      type: tosca.nodes.nfv.DeployableModule
+      properties:
+        name: optional-app-tier
+        description: "VDUs a consumer may choose not to instantiate"
+      requirements:
+        - member: AppVdu
+
+    # SOL001 clause 6.8.19: both name and certificate_type are required:true.
+    OamCertificate:
+      type: tosca.nodes.nfv.Certificate
+      properties:
+        name: oam-server-certificate
+        certificate_type: VNFOAM_CERT

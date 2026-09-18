@@ -1,0 +1,254 @@
+# Every policy type the library knows, in one deployment flavour.
+#
+# Two things this package settles that no other fixture does:
+#
+#   1. Instantiation levels come from the descriptor rather than being synthesised. IFA011 V5.4.1
+#      clause 7.1.8.2.2 makes instantiationLevel M,1..N, so a descriptor with no InstantiationLevels
+#      policy still needs one and the parser invents a "default" level. Here there are two real
+#      levels and a default_level naming one of them, which clause 7.1.8.2.2 requires once there is
+#      more than one entry.
+#
+#   2. An affinity group is declared by a policy but consumed on a profile. SOL001 V5.4.1
+#      Table 6.1-1 NOTE 3 puts affinityOrAntiAffinityGroupId on the VduProfile / MciopProfile /
+#      VirtualLinkProfile, while the policy names the profiled element as its target - so the
+#      assignment travels backwards, from policy to profile.
+#
+# It also carries VduScalingAspectDeltas, VduInitialDelta and a PlacementGroup. Those are valid
+# SOL001 and are parsed into the type registry, but no mapper reads them today; the README records
+# that, so the day one does, the diff is visible.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: >-
+  VNFD for the ExampleCorp PolicyCnf VNF. One flavour "scaled" with two instantiation levels,
+  a scaling aspect, and affinity rules over two VDUs.
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+node_types:
+  ExampleCorp.PolicyCnf.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 71b0a3d5-6c94-4f28-8ad3-e5c07b91f204
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: PolicyCnf
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: scaled
+      flavour_description:
+        type: string
+        default: "Two instantiation levels and a scaling aspect"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+
+topology_template:
+
+  substitution_mappings:
+    node_type: ExampleCorp.PolicyCnf.1_0
+    requirements:
+      virtual_link_mgmt: [ ApiCp, virtual_link ]
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.PolicyCnf.1_0
+
+    ApiVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: api-vdu
+        description: "API tier, the aspect that scales"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 10
+        mcio_identification_data:
+          name: policycnf-api
+          type: Deployment
+      requirements:
+        - container: ApiContainer
+
+    ApiContainer:
+      type: tosca.nodes.nfv.Vdu.OsContainer
+      properties:
+        name: api
+        description: "API container"
+        requested_cpu_resources: 200
+        requested_memory_resources: 256 MiB
+      artifacts:
+        sw_image:
+          type: tosca.artifacts.nfv.SwImage
+          file: ../Artifacts/Images/README.txt
+          properties:
+            name: policycnf-api
+            version: '1.0'
+            container_format: docker
+
+    DbVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: db-vdu
+        description: "Database tier, kept apart from the API tier"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 3
+        mcio_identification_data:
+          name: policycnf-db
+          type: StatefulSet
+      requirements:
+        - container: DbContainer
+
+    DbContainer:
+      type: tosca.nodes.nfv.Vdu.OsContainer
+      properties:
+        name: db
+        description: "Database container"
+        requested_cpu_resources: 1000
+        requested_memory_resources: 2 GiB
+      artifacts:
+        sw_image:
+          type: tosca.artifacts.nfv.SwImage
+          file: ../Artifacts/Images/README.txt
+          properties:
+            name: policycnf-db
+            version: '15.4'
+            container_format: docker
+
+    ApiCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: ApiVdu
+
+    DbCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: DbVdu
+        - virtual_link: DataVl
+
+    DataVl:
+      type: tosca.nodes.nfv.VnfVirtualLink
+      properties:
+        connectivity_type:
+          layer_protocols: [ ipv4 ]
+        description: "Data plane between the API tier and the database"
+        vl_profile:
+          max_bitrate_requirements:
+            root: 2000000
+          min_bitrate_requirements:
+            root: 200000
+
+  groups:
+    # SOL001 clause 6.10.10 lets an affinity rule target a PlacementGroup rather than the VDUs
+    # directly; the group is expanded to its members when the assignment is applied.
+    ApiPlacement:
+      type: tosca.groups.nfv.PlacementGroup
+      properties:
+        description: "The API tier VDUs, placed together"
+      members: [ ApiVdu ]
+
+  policies:
+
+    # ---------------------------------------------------------------- instantiation levels
+    #
+    # SOL001 clause 6.10.1. `levels` is required; `default_level` is "required if multiple entries
+    # in levels", which is the case here.
+    - instantiation_levels:
+        type: tosca.policies.nfv.InstantiationLevels
+        properties:
+          levels:
+            small:
+              description: "Entry footprint"
+              scale_info:
+                api_scaling:
+                  scale_level: 0
+            large:
+              description: "Scaled out for peak load"
+              scale_info:
+                api_scaling:
+                  scale_level: 2
+          default_level: small
+
+    # SOL001 clause 6.10.2. One policy per set of VDUs, giving the instance count per level.
+    - api_instantiation_levels:
+        type: tosca.policies.nfv.VduInstantiationLevels
+        properties:
+          levels:
+            small:
+              number_of_instances: 1
+            large:
+              number_of_instances: 6
+        targets: [ ApiVdu ]
+
+    - db_instantiation_levels:
+        type: tosca.policies.nfv.VduInstantiationLevels
+        properties:
+          levels:
+            small:
+              number_of_instances: 1
+            large:
+              number_of_instances: 3
+        targets: [ DbVdu ]
+
+    # ---------------------------------------------------------------- scaling
+    #
+    # SOL001 clause 6.10.5. All of name, description and max_scale_level are required:true.
+    - scaling_aspects:
+        type: tosca.policies.nfv.ScalingAspects
+        properties:
+          aspects:
+            api_scaling:
+              name: "API tier"
+              description: "Horizontal scaling of the API tier"
+              max_scale_level: 2
+              step_deltas: [ delta_1 ]
+
+    # SOL001 clause 6.10.6 and 6.10.8. Parsed as policy definitions, but no mapper reads them yet.
+    - api_scaling_deltas:
+        type: tosca.policies.nfv.VduScalingAspectDeltas
+        properties:
+          aspect: api_scaling
+          deltas:
+            delta_1:
+              number_of_instances: 2
+        targets: [ ApiVdu ]
+
+    - api_initial_delta:
+        type: tosca.policies.nfv.VduInitialDelta
+        properties:
+          initial_delta:
+            number_of_instances: 1
+        targets: [ ApiVdu ]
+
+    # ---------------------------------------------------------------- placement
+    #
+    # SOL001 clause 6.10.10. `scope` is required:true.
+    - api_affinity:
+        type: tosca.policies.nfv.AffinityRule
+        properties:
+          scope: container_namespace
+        targets: [ ApiPlacement ]
+
+    - api_db_anti_affinity:
+        type: tosca.policies.nfv.AntiAffinityRule
+        properties:
+          scope: cis_node
+        targets: [ ApiVdu, DbVdu ]

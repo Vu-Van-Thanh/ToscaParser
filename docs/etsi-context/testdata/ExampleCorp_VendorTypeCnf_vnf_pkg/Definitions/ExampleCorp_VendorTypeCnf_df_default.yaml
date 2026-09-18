@@ -1,0 +1,149 @@
+# Vendor-derived node types, two levels deep.
+#
+# [ETSI NORMATIVE] SOL001 V5.4.1 clause 6.11.2 requires the VNFD to declare a node type specific to
+# the VNF and derived from tosca.nodes.nfv.VNF. A consumer therefore never sees "tosca.nodes.nfv.VNF"
+# written in a node template, which is why classification has to walk derived_from rather than
+# compare type names.
+#
+# This package pushes that further than the other fixtures: every node template declares a vendor
+# type, and three of them sit two levels below the ETSI type. A parser that matched on names would
+# produce an empty VNFD here without reporting anything, which is the failure mode worth having a
+# fixture for.
+#
+#   ExampleCorp.VendorTypeCnf.1_0        -> tosca.nodes.nfv.VNF
+#   ExampleCorp.nodes.BaseUnit           -> tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+#   ExampleCorp.nodes.WebUnit            -> ExampleCorp.nodes.BaseUnit           (two levels)
+#   ExampleCorp.nodes.BaseContainer      -> tosca.nodes.nfv.Vdu.OsContainer
+#   ExampleCorp.nodes.HardenedContainer  -> ExampleCorp.nodes.BaseContainer      (two levels)
+#   ExampleCorp.nodes.ManagementCp       -> tosca.nodes.nfv.VduCp
+#   ExampleCorp.artifacts.SignedImage    -> tosca.artifacts.nfv.SwImage
+#
+# The artifact type matters as much as the node types: artifacts are selected by type, walking
+# derived_from, so a vendor artifact type derived from tosca.artifacts.nfv.SwImage still has to be
+# found as the SwImage of its container.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: >-
+  VNFD for the ExampleCorp VendorTypeCnf VNF. Nothing in the topology names an ETSI type directly.
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+artifact_types:
+  ExampleCorp.artifacts.SignedImage:
+    derived_from: tosca.artifacts.nfv.SwImage
+    description: A SwImage this vendor has signed.
+    properties:
+      signature_algorithm:
+        type: string
+        required: false
+
+node_types:
+
+  ExampleCorp.VendorTypeCnf.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: e47d2b60-1c8f-4935-a0d7-b83f6e514c29
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: VendorTypeCnf
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: default
+      flavour_description:
+        type: string
+        default: "Vendor types only"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+
+  ExampleCorp.nodes.BaseUnit:
+    derived_from: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+    description: Vendor base for every deployable unit in this product line.
+
+  ExampleCorp.nodes.WebUnit:
+    derived_from: ExampleCorp.nodes.BaseUnit
+    description: Two levels below the ETSI type.
+
+  ExampleCorp.nodes.BaseContainer:
+    derived_from: tosca.nodes.nfv.Vdu.OsContainer
+    description: Vendor base for every OS container in this product line.
+
+  ExampleCorp.nodes.HardenedContainer:
+    derived_from: ExampleCorp.nodes.BaseContainer
+    description: Two levels below the ETSI type.
+    properties:
+      hardening_profile:
+        type: string
+        required: false
+        default: cis-level-1
+
+  ExampleCorp.nodes.ManagementCp:
+    derived_from: tosca.nodes.nfv.VduCp
+    description: A connection point this vendor reserves for management traffic.
+
+topology_template:
+
+  substitution_mappings:
+    node_type: ExampleCorp.VendorTypeCnf.1_0
+    requirements:
+      virtual_link_mgmt: [ MgmtCp, virtual_link ]
+
+  node_templates:
+
+    MyVnf:
+      type: ExampleCorp.VendorTypeCnf.1_0
+
+    WebUnit:
+      type: ExampleCorp.nodes.WebUnit
+      properties:
+        name: web-unit
+        description: "Declared as a vendor type two levels below the ETSI one"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 4
+        mcio_identification_data:
+          name: vendortype-web
+          type: Deployment
+      requirements:
+        - container: WebContainer
+
+    WebContainer:
+      type: ExampleCorp.nodes.HardenedContainer
+      properties:
+        name: web
+        description: "Hardened container"
+        hardening_profile: cis-level-2
+        requested_cpu_resources: 400
+        requested_memory_resources: 256 MiB
+      artifacts:
+        signed_image:
+          # A vendor artifact type. Selection walks derived_from, so this is still the SwImage.
+          type: ExampleCorp.artifacts.SignedImage
+          file: ../Artifacts/Images/README.txt
+          properties:
+            name: vendortype-web
+            version: '3.2'
+            container_format: docker
+            signature_algorithm: ecdsa-p256
+
+    MgmtCp:
+      type: ExampleCorp.nodes.ManagementCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: WebUnit

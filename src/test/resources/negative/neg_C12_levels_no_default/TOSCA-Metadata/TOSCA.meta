@@ -1,0 +1,6 @@
+TOSCA-Meta-File-Version: 1.0
+Created-By: ETSI VNFD Parser tests
+CSAR-Version: 1.1
+Entry-Definitions: Definitions/descriptor.yaml
+ETSI-Entry-Manifest: package.mf
+ETSI-Entry-Change-Log: ChangeLog.txt

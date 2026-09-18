@@ -1,0 +1,83 @@
+# Violates: SOL001 V5.4.1 clause 6.8.14.7 - "If there is no artifact definition of type
+# HelmParamMappingScript there shall be no artifact definition of type HelmParamMappingRule."
+#
+# The rule file is meaningless on its own: clause 6.3.4.1 passes it to the script as the third
+# parameter, so without a script nothing ever reads it.
+#
+# Expected: exactly one ERROR, C5.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: A HelmParamMappingRule with no script to consume it
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+node_types:
+  ExampleCorp.NegC5.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 10000000-0000-4000-8000-000000000005
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: NegC5
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: default
+      flavour_description:
+        type: string
+        default: "A HelmParamMappingRule with no script to consume it"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+
+topology_template:
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.NegC5.1_0
+
+    AppVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: app-vdu
+        description: "Application tier realized from a chart"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 3
+        mcio_identification_data:
+          name: neg-app
+          type: Deployment
+
+    app_mciop:
+      type: tosca.nodes.nfv.Mciop
+      requirements:
+        - associatedVdu: AppVdu
+      artifacts:
+        app_chart:
+          type: tosca.artifacts.nfv.HelmChart
+          file: ../Artifacts/Charts/app.tgz
+        app_rule:
+          type: tosca.artifacts.nfv.HelmParamMappingRule
+          file: ../Artifacts/Scripts/rules.txt
+
+    AppCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: AppVdu

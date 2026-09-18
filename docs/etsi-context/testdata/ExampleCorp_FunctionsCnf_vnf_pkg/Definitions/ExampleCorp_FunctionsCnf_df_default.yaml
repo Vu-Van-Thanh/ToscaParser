@@ -1,0 +1,149 @@
+# TOSCA functions and scalar units, so a parser has to say what it can and cannot evaluate.
+#
+# [ETSI NORMATIVE] SOL001 V5.4.1 clause 5.9 Table 5.9-1 lists the functions a VNFD may use:
+# get_property, get_artifact, get_input, get_attribute, and the intrinsic concat, join and token.
+# get_operation_output and get_nodes_of_type are NOT among them.
+#
+# Table 5.9-2 restricts where get_input may appear - VNF.flavour_id, VNF.modifiable_attributes,
+# VNF.configurable_properties and Vdu.Compute.configurable_properties. Every other use in this file
+# is therefore outside that table. The parse must still succeed: a descriptor is described, not
+# corrected, and the value is tagged rather than dropped.
+#
+# What a correct parse produces, per property:
+#   get_input     -> INPUT_BOUND     no VNF instance exists at parse time, so no value exists either
+#   get_attribute -> RUNTIME_BOUND   same reason, but resolved by the VNFM rather than by an input
+#   get_property  -> RESOLVED_STATIC when the whole chain is inside this document
+#   concat/join   -> resolution of the weakest argument; the argument tree is kept either way
+#
+# Scalar units: TOSCA Simple Profile YAML 1.3 clause 3.3.6 spells them "<scalar> <unit>", with the
+# space. "128MB" below is readable but not conformant, and must be reported without being rejected.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: >-
+  VNFD for the ExampleCorp FunctionsCnf VNF. Every TOSCA function SOL001 allows, plus a conformant
+  and a non-conformant scalar unit.
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+node_types:
+  ExampleCorp.FunctionsCnf.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: c2a95e08-4f31-47d6-9b8a-16e0d7c35a94
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: FunctionsCnf
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: default
+      flavour_description:
+        type: string
+        default: "Function and scalar-unit coverage"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+
+topology_template:
+
+  inputs:
+    # Referenced by get_input below. TOSCA 1.3 clause 3.10: an input a function names must be
+    # declared here, otherwise the reference resolves to nothing.
+    deployment_flavour:
+      type: string
+      default: default
+      description: Flavour chosen at instantiation time
+    replica_count:
+      type: integer
+      default: 2
+      description: Instance count chosen at instantiation time
+    image_tag:
+      type: string
+      default: '1.0.0'
+      description: Container image tag chosen at instantiation time
+
+  substitution_mappings:
+    node_type: ExampleCorp.FunctionsCnf.1_0
+    requirements:
+      virtual_link_mgmt: [ AppCp, virtual_link ]
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.FunctionsCnf.1_0
+      properties:
+        # The one use of get_input that Table 5.9-2 does allow.
+        flavour_id: { get_input: deployment_flavour }
+
+    AppVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        # concat over literals only: every argument resolves, so the whole call resolves.
+        name: { concat: [ "app", "-", "vdu" ] }
+        # concat with one get_input: the call cannot resolve, and the argument tree is kept so a
+        # consumer can see what it would take to resolve it.
+        description: { concat: [ "App tier built from image tag ", { get_input: image_tag } ] }
+        vdu_profile:
+          # get_input outside Table 5.9-2. Parsed and tagged INPUT_BOUND, not rejected.
+          min_number_of_instances: { get_input: replica_count }
+          max_number_of_instances: 10
+        mcio_identification_data:
+          name: functionscnf-app
+          type: Deployment
+      requirements:
+        - container: AppContainer
+
+    AppContainer:
+      type: tosca.nodes.nfv.Vdu.OsContainer
+      properties:
+        # get_property reading another node template in the same document: fully static, so this
+        # one CAN be evaluated at parse time.
+        name: { get_property: [ AppVdu, name ] }
+        description: "Container whose memory request is written with the space TOSCA requires"
+        requested_cpu_resources: 300
+        # Conformant scalar unit: "<scalar> <unit>".
+        requested_memory_resources: 64 MiB
+        # Non-conformant: no space. Readable, reported, not rejected.
+        memory_resource_limit: "128MB"
+      artifacts:
+        sw_image:
+          type: tosca.artifacts.nfv.SwImage
+          file: ../Artifacts/Images/README.txt
+          properties:
+            name: functionscnf-app
+            # join over a literal list, with a separator.
+            version: { join: [ [ "1", "0", "0" ], "." ] }
+            container_format: docker
+
+    AppCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+        # get_attribute: tosca.nodes.nfv.VNF declares the attribute scale_status, and Table 5.9-1
+        # NOTE 2 covers reading it. Nothing can evaluate it until a VNF instance exists.
+        description: { get_attribute: [ SELF, scale_status ] }
+      requirements:
+        - virtual_binding: AppVdu
+
+    OpsCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+        # token: takes a string, a separator and an index.
+        description: { token: [ "north:south:east", ":", 1 ] }
+      requirements:
+        - virtual_binding: AppVdu

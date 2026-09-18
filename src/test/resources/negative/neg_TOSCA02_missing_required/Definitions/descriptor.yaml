@@ -1,0 +1,97 @@
+# Violates: TOSCA Simple Profile YAML 1.3 clause 3.6.2 - a property declared required:true must
+# be assigned. SOL001 V5.4.1 clause 6.8.9 declares both connectivity_type and vl_profile as
+# required:true on tosca.nodes.nfv.VnfVirtualLink; this template omits vl_profile.
+#
+# Unlike the C-rules, this one is not read from prose: it comes from the ETSI type definitions file
+# itself, so it needs no Java to express and would follow a new release of that file automatically.
+#
+# Expected: exactly one ERROR, TOSCA02.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: A virtual link with no vl_profile
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+node_types:
+  ExampleCorp.NegTosca02.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 10000000-0000-4000-8000-000000000002
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: NegTosca02
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: default
+      flavour_description:
+        type: string
+        default: "A virtual link with no vl_profile"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+
+topology_template:
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.NegTosca02.1_0
+
+    AppVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: app-vdu
+        description: "Application tier"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 3
+        mcio_identification_data:
+          name: neg-app
+          type: Deployment
+      requirements:
+        - container: AppContainer
+
+    AppContainer:
+      type: tosca.nodes.nfv.Vdu.OsContainer
+      properties:
+        name: app
+        description: "Application container"
+        requested_cpu_resources: 200
+        requested_memory_resources: 256 MiB
+      artifacts:
+        sw_image:
+          type: tosca.artifacts.nfv.SwImage
+          file: ../Artifacts/Images/README.txt
+          properties:
+            name: neg-app
+            version: '1.0'
+            container_format: docker
+
+    DataVl:
+      type: tosca.nodes.nfv.VnfVirtualLink
+      properties:
+        connectivity_type:
+          layer_protocols: [ ipv4 ]
+        description: "Missing the required vl_profile"
+
+    AppCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: AppVdu

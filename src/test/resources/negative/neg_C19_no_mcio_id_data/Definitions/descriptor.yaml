@@ -1,0 +1,98 @@
+# Violates: IFA011 V5.4.1 clause 7.1.6.2.2 - mcioIdentificationData "shall be present when the
+# VDU is realized by one or a set of OS containers", which every VDU in scope of this library is.
+#
+# It is the only link at VNFD level between a VDU and the MCIO the CISM will create for it:
+# SOL018 Table 6.2.2.1-1 maps Deployment.metadata.name from this very property. Without it the VNFM
+# has no way to query the workload it just asked for.
+#
+# Expected: TWO errors, C19 and TOSCA02 - and that overlap is the point.
+#
+# The ETSI type definitions file states no `required` key for mcio_identification_data, and TOSCA
+# Simple Profile YAML 1.3 clause 3.6.2 gives `required` the default true. So the generic
+# required-property check (TOSCA02), which reads the type file and needs no Java, already catches
+# this. C19 is a second statement of the same thing taken from IFA011 prose; within the CNF-only
+# scope of this library the two conditions coincide exactly.
+#
+# The IFA011 wording is narrower than the type file: "shall be present when the VDU is realized by
+# one or a set of OS containers and shall be absent otherwise". The type file has no way to express
+# "and shall be absent otherwise", which is the only part C19 could ever add - and it does not check
+# it. Worth knowing before adding more hand-written rules that a type file already covers.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: A VDU with no mcio_identification_data
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+node_types:
+  ExampleCorp.NegC19.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 10000000-0000-4000-8000-000000000019
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: NegC19
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: default
+      flavour_description:
+        type: string
+        default: "A VDU with no mcio_identification_data"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+
+topology_template:
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.NegC19.1_0
+
+    AppVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: app-vdu
+        description: "Application tier with no MCIO identification"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 3
+      requirements:
+        - container: AppContainer
+
+    AppContainer:
+      type: tosca.nodes.nfv.Vdu.OsContainer
+      properties:
+        name: app
+        description: "Application container"
+        requested_cpu_resources: 200
+        requested_memory_resources: 256 MiB
+      artifacts:
+        sw_image:
+          type: tosca.artifacts.nfv.SwImage
+          file: ../Artifacts/Images/README.txt
+          properties:
+            name: neg-app
+            version: '1.0'
+            container_format: docker
+
+    AppCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: AppVdu

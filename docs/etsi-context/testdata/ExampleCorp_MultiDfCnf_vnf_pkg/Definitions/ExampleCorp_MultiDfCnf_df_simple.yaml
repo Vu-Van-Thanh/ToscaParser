@@ -1,0 +1,66 @@
+# LOWER LEVEL service template - deployment flavour "simple".
+#
+# [ETSI NORMATIVE] SOL001 V5.4.1 clause 6.11.2 d): the flavour is selected through
+# "a flavour_id property and its value as defined in substitution_filter". NOTE 1 of that clause
+# records that the older property_mapping grammar was replaced from v3.3.1 onwards, so
+# substitution_filter is the current form and the one used here.
+#
+# One VDU, realized from an MCIOP.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: Deployment flavour "simple" of the ExampleCorp MultiDfCnf VNF - one MCIOP-realized VDU.
+
+imports:
+  - ExampleCorp_MultiDfCnf_vnf_node_type.yaml
+
+topology_template:
+
+  substitution_mappings:
+    node_type: ExampleCorp.MultiDfCnf.1_0
+    substitution_filter:
+      properties:
+        - flavour_id: { equal: simple }
+    requirements:
+      virtual_link_mgmt: [ FrontCp, virtual_link ]
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.MultiDfCnf.1_0
+      properties:
+        flavour_id: simple
+        flavour_description: "Minimal footprint: a single front tier deployed from one chart"
+
+    FrontVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: front-vdu
+        description: "Front tier"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 2
+        mcio_identification_data:
+          name: multidf-simple-front
+          type: Deployment
+
+    simple_mciop:
+      type: tosca.nodes.nfv.Mciop
+      requirements:
+        - associatedVdu: FrontVdu
+      artifacts:
+        simple_chart:
+          type: tosca.artifacts.nfv.HelmChart
+          file: ../Artifacts/Charts/multidf-simple-1.0.0.tgz
+        simple_param_mapping_script:
+          type: tosca.artifacts.nfv.HelmParamMappingScript
+          file: ../Artifacts/Scripts/param_mapping.sh
+          properties:
+            language: bash
+
+    FrontCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: FrontVdu

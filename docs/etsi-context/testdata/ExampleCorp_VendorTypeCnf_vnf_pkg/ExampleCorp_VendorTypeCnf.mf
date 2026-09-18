@@ -1,0 +1,4 @@
+metadata:
+vnf_product_name: VendorTypeCnf
+vnf_provider_id: ExampleCorp
+vnf_package_version: 1.0

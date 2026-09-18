@@ -1,0 +1,76 @@
+# Violates: IFA011 V5.4.1 clause 7.1.2.2 Note 6 - "One of the virtualComputeDesc, the
+# osContainerDesc, or mciopId shall contain at least one element." Only the latter two exist in a
+# CNF, and this descriptor produces neither.
+#
+# The VDU declares a `container` requirement pointing at a node template that is not in the
+# topology. The requirement is non-empty, so the VDU is taken to be realized MCIO by MCIO and rule
+# C2 stays silent - but no Vdu.OsContainer node exists, so no OsContainerDesc is ever built.
+# A dangling reference, which is how this shows up in practice.
+#
+# Expected: exactly one ERROR, C1.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: No workload is described at all
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+node_types:
+  ExampleCorp.NegC1.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 10000000-0000-4000-8000-000000000001
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: NegC1
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: default
+      flavour_description:
+        type: string
+        default: "No workload is described at all"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+
+topology_template:
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.NegC1.1_0
+
+    AppVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: app-vdu
+        description: "Application tier"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 3
+        mcio_identification_data:
+          name: neg-app
+          type: Deployment
+      requirements:
+        - container: AppContainer
+
+    AppCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: AppVdu

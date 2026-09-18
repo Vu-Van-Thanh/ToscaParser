@@ -1,0 +1,4 @@
+metadata:
+vnf_product_name: NegC8
+vnf_provider_id: ExampleCorp
+vnf_package_version: 1.0

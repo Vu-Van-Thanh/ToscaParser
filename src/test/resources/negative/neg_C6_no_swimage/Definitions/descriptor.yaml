@@ -1,0 +1,79 @@
+# Violates: SOL001 V5.4.1 clause 6.8.12.6 - a Vdu.OsContainer shall contain one artifact of
+# type tosca.artifacts.nfv.SwImage. IFA011 clause 7.1.6.13.2 makes the corresponding
+# OsContainerDesc.swImageDesc M,1, so there is nothing to point at.
+#
+# Expected: exactly one ERROR, C6.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: A Vdu.OsContainer with no SwImage artifact
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+node_types:
+  ExampleCorp.NegC6a.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 10000000-0000-4000-8000-000000000061
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: NegC6a
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: default
+      flavour_description:
+        type: string
+        default: "A Vdu.OsContainer with no SwImage artifact"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+
+topology_template:
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.NegC6a.1_0
+
+    AppVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: app-vdu
+        description: "Application tier"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 3
+        mcio_identification_data:
+          name: neg-app
+          type: Deployment
+      requirements:
+        - container: AppContainer
+
+    AppContainer:
+      type: tosca.nodes.nfv.Vdu.OsContainer
+      properties:
+        name: app
+        description: "Application container with no image"
+        requested_cpu_resources: 200
+        requested_memory_resources: 256 MiB
+
+    AppCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: AppVdu

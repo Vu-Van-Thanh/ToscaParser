@@ -1,0 +1,108 @@
+# LOWER LEVEL service template - deployment flavour "complex".
+#
+# Two VDUs, both realized from ONE MCIOP. The point of this template is the requirement key that
+# appears twice:
+#
+#     requirements:
+#       - associatedVdu: FrontVdu
+#       - associatedVdu: WorkerVdu
+#
+# [ETSI NORMATIVE] SOL001 V5.4.1 clause 6.8.14.6 gives associatedVdu occurrences [1, UNBOUNDED],
+# and TOSCA writes requirements as a sequence of single-entry maps precisely so a key may repeat.
+# A parser that reads that sequence into a Map<String,String> silently keeps only the last entry
+# and loses WorkerVdu; SOL001 Annex A.23 relies on the same shape.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: >-
+  Deployment flavour "complex" of the ExampleCorp MultiDfCnf VNF - a front tier and a worker tier
+  deployed from a single chart.
+
+imports:
+  - ExampleCorp_MultiDfCnf_vnf_node_type.yaml
+
+topology_template:
+
+  substitution_mappings:
+    node_type: ExampleCorp.MultiDfCnf.1_0
+    substitution_filter:
+      properties:
+        - flavour_id: { equal: complex }
+    requirements:
+      virtual_link_mgmt: [ FrontCp, virtual_link ]
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.MultiDfCnf.1_0
+      properties:
+        flavour_id: complex
+        flavour_description: "Front and worker tiers, both from one chart"
+
+    FrontVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: front-vdu
+        description: "Front tier"
+        vdu_profile:
+          min_number_of_instances: 2
+          max_number_of_instances: 8
+        mcio_identification_data:
+          name: multidf-complex-front
+          type: Deployment
+
+    WorkerVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: worker-vdu
+        description: "Worker tier"
+        vdu_profile:
+          min_number_of_instances: 3
+          max_number_of_instances: 12
+        mcio_identification_data:
+          name: multidf-complex-worker
+          type: StatefulSet
+
+    complex_mciop:
+      type: tosca.nodes.nfv.Mciop
+      requirements:
+        # The same key twice - see the file header. Both entries must survive.
+        - associatedVdu: FrontVdu
+        - associatedVdu: WorkerVdu
+      artifacts:
+        complex_chart:
+          type: tosca.artifacts.nfv.HelmChart
+          file: ../Artifacts/Charts/multidf-complex-1.0.0.tgz
+        complex_param_mapping_script:
+          type: tosca.artifacts.nfv.HelmParamMappingScript
+          file: ../Artifacts/Scripts/param_mapping.sh
+          properties:
+            language: bash
+
+    FrontCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: FrontVdu
+        - virtual_link: WorkerVl
+
+    WorkerCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: WorkerVdu
+        - virtual_link: WorkerVl
+
+    WorkerVl:
+      type: tosca.nodes.nfv.VnfVirtualLink
+      properties:
+        connectivity_type:
+          layer_protocols: [ ipv4 ]
+        description: "Link carrying work items from the front tier to the workers"
+        vl_profile:
+          max_bitrate_requirements:
+            root: 10000000
+          min_bitrate_requirements:
+            root: 1000000

@@ -1,0 +1,49 @@
+# The VNF-specific node type, shared by the top-level template and both lower-level templates.
+#
+# [ETSI NORMATIVE] SOL001 V5.4.1 clause 6.11.2 requires the VNFD to declare a node type derived
+# from tosca.nodes.nfv.VNF and specific to this VNF. Holding it in its own file is what lets the
+# three service templates below agree on one definition of flavour_id.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: Node type of the ExampleCorp MultiDfCnf VNF.
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+node_types:
+  ExampleCorp.MultiDfCnf.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 5e8b1c44-9a07-4d63-b2f1-7c930ae15d82
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: MultiDfCnf
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        constraints:
+          - valid_values: [ simple, complex ]
+      flavour_description:
+        type: string
+        default: ''
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+    requirements:
+      - virtual_link_mgmt:
+          capability: tosca.capabilities.nfv.VirtualLinkable
+          relationship: tosca.relationships.nfv.VirtualLinksTo
+          occurrences: [ 0, 1 ]

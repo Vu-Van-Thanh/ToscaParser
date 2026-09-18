@@ -1,0 +1,7 @@
+TOSCA-Meta-File-Version: 1.0
+Created-By: ExampleCorp NFV Team
+CSAR-Version: 1.1
+Entry-Definitions: Definitions/ExampleCorp_PolicyCnf_df_scaled.yaml
+Other-Definitions: Definitions/etsi_nfv_sol001_vnfd_types.yaml
+ETSI-Entry-Manifest: ExampleCorp_PolicyCnf.mf
+ETSI-Entry-Change-Log: ChangeLog.txt

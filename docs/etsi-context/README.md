@@ -13,16 +13,28 @@ re-deriving ETSI mapping rules from scratch each session.
   documented correction (an earlier "Annex A.22" citation was wrong — see the correction note inside).
 - `docs/ETSI_VNFD_Helm_Mapping.md` — the original Helm-chart-only (MCIOP simplified design) VNFD
   mapping writeup.
-- `testdata/ExampleCorp_SimpleWebCnf_vnf_pkg/` — CNF package, MCIOP/Helm only, no `Vdu.OsContainer`
-  (SOL001 Annex A.23 pattern).
-- `testdata/ExampleCorp_HybridWebCnf_vnf_pkg/` — CNF package combining `Vdu.OsContainer` +
-  `Mciop` **on the same VDU** (an earlier, since-reconsidered "hybrid" interpretation — kept as a
-  fixture, but see the correction note in the Helm_Support doc: the *current* preferred "hybrid"
-  design uses 2 separate VDUs instead — not yet built as a package). Includes
-  `ExampleCorp_HybridWebCnf_vnf_pkg_PARSED_VNFD.json`, an illustrative hand-built parsed-VNFD result
-  for this exact package — useful as an expected-output fixture for a first parser test.
-- `testdata/ExampleCorp_RegularCnf_vnf_pkg/` — CNF package, "regular" design: 2 separate VDUs, each
-  with an explicit `Vdu.OsContainer` child, no MCIOP/Helm at all (SOL001 Annex A.18 pattern).
+- `testdata/` - nine VNF packages. The first three came with this starter kit; the rest were built
+  later to reach code paths nothing else touched. Each has its own `README.md` stating what it
+  proves and what the parse is expected to produce.
+
+  | Package | What it is for |
+  |---|---|
+  | `ExampleCorp_SimpleWebCnf_vnf_pkg` | MCIOP/Helm only, no `Vdu.OsContainer` (SOL001 Annex A.23) |
+  | `ExampleCorp_RegularCnf_vnf_pkg` | 2 VDUs, each with an explicit `Vdu.OsContainer`, no Helm (Annex A.18) |
+  | `ExampleCorp_HybridWebCnf_vnf_pkg` | `Vdu.OsContainer` **and** `Mciop` on the same VDU - an earlier reading, no ETSI worked example; kept, superseded by HybridWebCnf2 |
+  | `ExampleCorp_HybridWebCnf2_vnf_pkg` | the hybrid design actually followed: one flavour, two VDUs on different realization paths |
+  | `ExampleCorp_MultiDfCnf_vnf_pkg` | the two-level design of SOL001 cl. 6.11.2, two flavours, one `Mciop` with two `associatedVdu` |
+  | `ExampleCorp_FullStackCnf_vnf_pkg` | every remaining CNF node type; documents which ones reach no mapper |
+  | `ExampleCorp_PolicyCnf_vnf_pkg` | every policy type; real instantiation levels instead of a synthesised one |
+  | `ExampleCorp_FunctionsCnf_vnf_pkg` | every TOSCA function of cl. 5.9, plus conformant and non-conformant scalar units |
+  | `ExampleCorp_VendorTypeCnf_vnf_pkg` | vendor types two levels below the ETSI ones, so nothing can be matched by name |
+
+  Non-conformant packages live separately, in `src/test/resources/negative/` - one per broken SHALL,
+  with a README of their own.
+
+- `demo/` at the repository root is a separate Maven project that consumes the parser as a library
+  and serves any of these packages as JSON over HTTP. `GET /parse-all` prints one row per package.
+
 
 ## Not included here (add yourself)
 
