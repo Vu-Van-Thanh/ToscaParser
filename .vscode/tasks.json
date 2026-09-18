@@ -1,4 +1,7 @@
 {
+  // Every task goes through the Maven wrapper rather than a bare `mvn`, because `mvn` is not
+  // necessarily on PATH - it is not on this machine - and the wrapper also pins one Maven version
+  // for everyone who opens the repository.
   "version": "2.0.0",
   "tasks": [
     {
@@ -7,7 +10,8 @@
       // the suite has its own task below.
       "label": "install parser library",
       "type": "shell",
-      "command": "mvn",
+      "command": "${workspaceFolder}/mvnw",
+      "windows": { "command": "${workspaceFolder}\\mvnw.cmd" },
       "args": ["-q", "-DskipTests", "install"],
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": ["$maven"],
@@ -21,7 +25,8 @@
     {
       "label": "library: test",
       "type": "shell",
-      "command": "mvn",
+      "command": "${workspaceFolder}/mvnw",
+      "windows": { "command": "${workspaceFolder}\\mvnw.cmd" },
       "args": ["-o", "clean", "test"],
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": ["$maven"],
@@ -30,9 +35,10 @@
     {
       "label": "demo: package",
       "type": "shell",
-      "command": "mvn",
-      "args": ["-q", "clean", "package", "-DskipTests"],
-      "options": { "cwd": "${workspaceFolder}/demo" },
+      "command": "${workspaceFolder}/mvnw",
+      "windows": { "command": "${workspaceFolder}\\mvnw.cmd" },
+      "args": ["-q", "-f", "demo/pom.xml", "clean", "package", "-DskipTests"],
+      "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": ["$maven"],
       "group": "build"
     },
@@ -41,7 +47,8 @@
       // code even when the two projects are not open as one workspace.
       "label": "install parser library with sources",
       "type": "shell",
-      "command": "mvn",
+      "command": "${workspaceFolder}/mvnw",
+      "windows": { "command": "${workspaceFolder}\\mvnw.cmd" },
       "args": ["-q", "-DskipTests", "source:jar", "install"],
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": ["$maven"],
