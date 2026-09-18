@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.etsi.vnfd.template.NodeTemplate;
 import com.example.etsi.vnfd.template.RequirementAssignment;
 import com.example.etsi.vnfd.utils.ToscaYamlLoader;
+import com.example.etsi.vnfd.utils.Yamls;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -26,7 +27,7 @@ class RequirementDuplicateKeyTest {
     private static Map<String, NodeTemplate> parseNodeTemplates(String yaml) {
         Map<String, Object> document = ToscaYamlLoader.loadMapping(
                 "test.yaml", yaml.getBytes(StandardCharsets.UTF_8));
-        Map<String, Object> topology = ToscaYamlLoader.asStringKeyedMap(document.get("topology_template"));
+        Map<String, Object> topology = Yamls.map(document.get("topology_template"));
         return TopologyConverter.readNodeTemplates(topology.get("node_templates"), "test.yaml");
     }
 

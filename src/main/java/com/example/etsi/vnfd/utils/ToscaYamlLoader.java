@@ -1,7 +1,6 @@
 package com.example.etsi.vnfd.utils;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -50,7 +49,7 @@ public final class ToscaYamlLoader {
                     "Expected a YAML mapping at the top level of " + file + " but found "
                             + loaded.getClass().getSimpleName());
         }
-        return asStringKeyedMap(loaded);
+        return Yamls.map(loaded);
     }
 
     private static Yaml newYaml() {
@@ -61,20 +60,4 @@ public final class ToscaYamlLoader {
         return new Yaml(new SafeConstructor(options));
     }
 
-    /**
-     * Re-keys a YAML mapping to {@code String}, preserving order.
-     * YAML permits non-string keys; TOSCA does not use them, so they are stringified rather than
-     * rejected.
-     */
-    @SuppressWarnings("unchecked")
-    public static Map<String, Object> asStringKeyedMap(Object value) {
-        if (!(value instanceof Map)) {
-            return Collections.emptyMap();
-        }
-        Map<String, Object> out = new LinkedHashMap<>();
-        for (Map.Entry<Object, Object> e : ((Map<Object, Object>) value).entrySet()) {
-            out.put(String.valueOf(e.getKey()), e.getValue());
-        }
-        return out;
-    }
 }

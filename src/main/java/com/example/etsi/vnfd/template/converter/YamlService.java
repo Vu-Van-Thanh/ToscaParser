@@ -4,6 +4,7 @@ import com.example.etsi.vnfd.csar.CsarReader;
 import com.example.etsi.vnfd.csar.PathResolver;
 import com.example.etsi.vnfd.csar.ToscaMeta;
 import com.example.etsi.vnfd.utils.ToscaYamlLoader;
+import com.example.etsi.vnfd.utils.Yamls;
 import com.example.etsi.vnfd.template.NodeTemplate;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
 import com.example.etsi.vnfd.template.SourceRef;
@@ -143,16 +144,16 @@ public final class YamlService {
         template.setToscaDefinitionsVersion(str(document.get("tosca_definitions_version")));
         template.setDescription(str(document.get("description")));
         template.setNamespace(str(document.get("namespace")));
-        template.metadata().putAll(ToscaYamlLoader.asStringKeyedMap(document.get("metadata")));
+        template.metadata().putAll(Yamls.map(document.get("metadata")));
         template.dslDefinitions().putAll(
-                ToscaYamlLoader.asStringKeyedMap(document.get("dsl_definitions")));
+                Yamls.map(document.get("dsl_definitions")));
         template.imports().addAll(readImports(document.get("imports")));
         template.repositories().putAll(TopologyConverter.readRepositories(document.get("repositories")));
 
         for (String section : TypeRegistryBuilder.typeSectionNames()) {
             if (document.containsKey(section)) {
                 template.typeDefinitions().put(section,
-                        ToscaYamlLoader.asStringKeyedMap(document.get(section)));
+                        Yamls.map(document.get(section)));
             }
         }
 
@@ -163,7 +164,7 @@ public final class YamlService {
     }
 
     private TopologyTemplate readTopology(String file, Object block) {
-        Map<String, Object> map = ToscaYamlLoader.asStringKeyedMap(block);
+        Map<String, Object> map = Yamls.map(block);
         TopologyTemplate topology = new TopologyTemplate();
         topology.setDescription(str(map.get("description")));
         topology.inputs().putAll(TopologyConverter.readParameters(map.get("inputs")));
@@ -205,7 +206,7 @@ public final class YamlService {
                 : java.util.Collections.singletonList(block);
         for (Object entry : entries) {
             if (entry instanceof Map) {
-                Map<String, Object> map = ToscaYamlLoader.asStringKeyedMap(entry);
+                Map<String, Object> map = Yamls.map(entry);
                 Object file = map.get("file");
                 if (file != null) {
                     out.add(String.valueOf(file));
@@ -213,7 +214,7 @@ public final class YamlService {
                     // Named form: "my_defs: { file: defs.yaml }" or "my_defs: defs.yaml".
                     Object only = map.values().iterator().next();
                     if (only instanceof Map) {
-                        Object nested = ToscaYamlLoader.asStringKeyedMap(only).get("file");
+                        Object nested = Yamls.map(only).get("file");
                         if (nested != null) {
                             out.add(String.valueOf(nested));
                         }

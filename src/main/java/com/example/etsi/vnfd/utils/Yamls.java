@@ -24,7 +24,13 @@ public final class Yamls {
     private Yamls() {
     }
 
-    /** A YAML mapping with its keys as strings, or an empty map if this is not a mapping. */
+    /**
+     * A YAML mapping with its keys as strings, or an empty map if this is not a mapping.
+     *
+     * <p>YAML permits non-string keys; TOSCA does not use them, so they are stringified rather than
+     * rejected. Order is preserved, and carried all the way to the parsed VNFD so that output is
+     * stable between runs and therefore comparable.
+     */
     @SuppressWarnings("unchecked")
     public static Map<String, Object> map(Object value) {
         if (!(value instanceof Map)) {
