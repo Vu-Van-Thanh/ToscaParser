@@ -3,3 +3,5 @@ target/
 .idea/
 *.iml
 .vscode/
+!demo/.vscode/launch.json
+!demo/.vscode/settings.json

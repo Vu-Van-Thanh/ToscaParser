@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Pick this from the Run and Debug dropdown, then F5.
+      //
+      // mainClass must be the fully qualified name. If the run command shows a bare 'Main', VS Code
+      // is compiling the open file on its own rather than using this configuration, which means the
+      // project has not been imported - clean the Java language server workspace and wait for the
+      // import to finish.
+      "name": "Demo: Spring Boot",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "com.example.etsi.vnfd.demo.Main",
+      "projectName": "etsi-vnfd-parser-demo",
+      "console": "internalConsole",
+      "env": { "SPRING_OUTPUT_ANSI_ENABLED": "ALWAYS" }
+    },
+    {
+      "name": "Demo: Spring Boot on :9000",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "com.example.etsi.vnfd.demo.Main",
+      "projectName": "etsi-vnfd-parser-demo",
+      "args": "--server.port=9000",
+      "console": "internalConsole"
+    },
+    {
+      // For an app started from a terminal with
+      //   ..\mvnw.cmd -f pom.xml spring-boot:run "-Dspring-boot.run.jvmArguments=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+      "name": "Attach to running demo (:5005)",
+      "type": "java",
+      "request": "attach",
+      "hostName": "localhost",
+      "port": 5005
+    }
+  ]
+}
