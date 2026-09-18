@@ -31,7 +31,7 @@ public final class PropertyDef {
     private PropertyDef keySchema;
     private final Map<String, Object> metadata = new LinkedHashMap<>();
 
-    PropertyDef(String name) {
+    public PropertyDef(String name) {
         this.name = name;
     }
 
@@ -47,7 +47,7 @@ public final class PropertyDef {
      * <p>So each facet falls back to the inherited declaration when this one does not state it, and
      * constraints accumulate: a derived type may narrow, never widen.
      */
-    PropertyDef refining(PropertyDef inherited) {
+    public PropertyDef refining(PropertyDef inherited) {
         if (inherited == null) {
             return this;
         }
@@ -128,31 +128,31 @@ public final class PropertyDef {
         return sensitive != null && Boolean.parseBoolean(String.valueOf(sensitive));
     }
 
-    void setType(String type) {
+    public void setType(String type) {
         this.type = type;
     }
 
-    void setDescription(String description) {
+    public void setDescription(String description) {
         this.description = description;
     }
 
-    void setRequired(Boolean required) {
+    public void setRequired(Boolean required) {
         this.required = required;
     }
 
-    void setDefaultValue(Object defaultValue) {
+    public void setDefaultValue(Object defaultValue) {
         this.defaultValue = defaultValue;
     }
 
-    void setStatus(String status) {
+    public void setStatus(String status) {
         this.status = status;
     }
 
-    void setEntrySchema(PropertyDef entrySchema) {
+    public void setEntrySchema(PropertyDef entrySchema) {
         this.entrySchema = entrySchema;
     }
 
-    void setKeySchema(PropertyDef keySchema) {
+    public void setKeySchema(PropertyDef keySchema) {
         this.keySchema = keySchema;
     }
 

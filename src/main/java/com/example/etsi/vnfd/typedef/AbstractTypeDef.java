@@ -65,15 +65,15 @@ public abstract class AbstractTypeDef {
         return Optional.ofNullable(declaredIn);
     }
 
-    void setDerivedFrom(String derivedFrom) {
+    public void setDerivedFrom(String derivedFrom) {
         this.derivedFrom = derivedFrom;
     }
 
-    void setDescription(String description) {
+    public void setDescription(String description) {
         this.description = description;
     }
 
-    void setVersion(String version) {
+    public void setVersion(String version) {
         this.version = version;
     }
 

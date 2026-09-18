@@ -1,7 +1,12 @@
-package com.example.etsi.vnfd.template.value;
+package com.example.etsi.vnfd.services.pkg2template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.etsi.vnfd.template.value.FunctionCall;
+import com.example.etsi.vnfd.template.value.FunctionName;
+import com.example.etsi.vnfd.template.value.Kind;
+import com.example.etsi.vnfd.template.value.PropertyValue;
+import com.example.etsi.vnfd.template.value.Resolution;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,7 +25,7 @@ class PropertyValueParserTest {
     @Test
     @DisplayName("plain scalars are literals")
     void scalarIsLiteral() {
-        PropertyValue<Object> v = PropertyValueParser.parse("web-vdu");
+        PropertyValue<Object> v = TemplateReader.parsePropertyValue("web-vdu");
 
         assertThat(v.kind()).isEqualTo(Kind.LITERAL);
         assertThat(v.resolution()).isEqualTo(Resolution.RESOLVED_STATIC);
@@ -31,7 +36,7 @@ class PropertyValueParserTest {
     @Test
     @DisplayName("get_input is tagged INPUT_BOUND and never evaluated")
     void getInputIsInputBound() {
-        PropertyValue<Object> v = PropertyValueParser.parse(singleEntry("get_input", "image_tag"));
+        PropertyValue<Object> v = TemplateReader.parsePropertyValue(singleEntry("get_input", "image_tag"));
 
         assertThat(v.kind()).isEqualTo(Kind.FUNCTION);
         assertThat(v.resolution()).isEqualTo(Resolution.INPUT_BOUND);
@@ -47,7 +52,7 @@ class PropertyValueParserTest {
     @Test
     @DisplayName("get_attribute is tagged RUNTIME_BOUND: no VNF instance exists while parsing")
     void getAttributeIsRuntimeBound() {
-        PropertyValue<Object> v = PropertyValueParser.parse(
+        PropertyValue<Object> v = TemplateReader.parsePropertyValue(
                 singleEntry("get_attribute", Arrays.asList("SELF", "scale_status")));
 
         assertThat(v.resolution()).isEqualTo(Resolution.RUNTIME_BOUND);
@@ -57,7 +62,7 @@ class PropertyValueParserTest {
     @Test
     @DisplayName("get_property args keep their order")
     void getPropertyKeepsArgOrder() {
-        PropertyValue<Object> v = PropertyValueParser.parse(
+        PropertyValue<Object> v = TemplateReader.parsePropertyValue(
                 singleEntry("get_property", Arrays.asList("SELF", "vdu_profile", "min_number_of_instances")));
 
         FunctionCall<?> call = (FunctionCall<?>) v;
@@ -69,7 +74,7 @@ class PropertyValueParserTest {
     @Test
     @DisplayName("a single-key map whose key is not a function stays a literal")
     void singleKeyMapIsNotAutomaticallyAFunction() {
-        PropertyValue<Object> v = PropertyValueParser.parse(singleEntry("associated_layer_protocol", "ipv4"));
+        PropertyValue<Object> v = TemplateReader.parsePropertyValue(singleEntry("associated_layer_protocol", "ipv4"));
 
         assertThat(v.kind()).isEqualTo(Kind.LITERAL);
         assertThat(v.resolved()).isPresent();
@@ -82,13 +87,13 @@ class PropertyValueParserTest {
         m.put("get_input", "x");
         m.put("something_else", "y");
 
-        assertThat(PropertyValueParser.parse(m).kind()).isEqualTo(Kind.LITERAL);
+        assertThat(TemplateReader.parsePropertyValue(m).kind()).isEqualTo(Kind.LITERAL);
     }
 
     @Test
     @DisplayName("a function nested inside a list is still detected")
     void detectsFunctionNestedInList() {
-        PropertyValue<Object> v = PropertyValueParser.parse(
+        PropertyValue<Object> v = TemplateReader.parsePropertyValue(
                 Arrays.asList("literal", singleEntry("get_input", "proto")));
 
         assertThat(v.kind()).isEqualTo(Kind.LITERAL);
@@ -101,7 +106,7 @@ class PropertyValueParserTest {
     @Test
     @DisplayName("nested function inside concat args round-trips")
     void detectsNestedFunctionInConcat() {
-        PropertyValue<Object> v = PropertyValueParser.parse(
+        PropertyValue<Object> v = TemplateReader.parsePropertyValue(
                 singleEntry("concat", Arrays.asList("v", singleEntry("get_input", "tag"))));
 
         FunctionCall<?> concat = (FunctionCall<?>) v;
@@ -114,7 +119,7 @@ class PropertyValueParserTest {
     @Test
     @DisplayName("get_operation_output parses as UNKNOWN: valid TOSCA, absent from SOL001 Table 5.9-1")
     void nonSol001FunctionIsFlagged() {
-        PropertyValue<Object> v = PropertyValueParser.parse(
+        PropertyValue<Object> v = TemplateReader.parsePropertyValue(
                 singleEntry("get_operation_output", Arrays.asList("SELF", "Standard", "create", "out")));
 
         assertThat(v.kind()).isEqualTo(Kind.FUNCTION);
@@ -127,6 +132,6 @@ class PropertyValueParserTest {
     @DisplayName("the original YAML is always retained")
     void keepsRawValue() {
         Map<String, Object> raw = singleEntry("get_input", "image_tag");
-        assertThat(PropertyValueParser.parse(raw).raw()).isSameAs(raw);
+        assertThat(TemplateReader.parsePropertyValue(raw).raw()).isSameAs(raw);
     }
 }

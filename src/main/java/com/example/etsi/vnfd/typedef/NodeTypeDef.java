@@ -19,7 +19,7 @@ public final class NodeTypeDef extends AbstractTypeDef {
     private final Map<String, Object> interfaces = new LinkedHashMap<>();
     private final Map<String, Object> artifacts = new LinkedHashMap<>();
 
-    NodeTypeDef(String name) {
+    public NodeTypeDef(String name) {
         super(name);
     }
 

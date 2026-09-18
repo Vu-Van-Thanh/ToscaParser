@@ -1,7 +1,10 @@
-package com.example.etsi.vnfd.typedef;
+package com.example.etsi.vnfd.services.pkg2template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.etsi.vnfd.typedef.EtsiTypes;
+import com.example.etsi.vnfd.typedef.PropertyDef;
+import com.example.etsi.vnfd.typedef.TypeRegistry;
 import java.util.Arrays;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -17,14 +20,14 @@ import org.junit.jupiter.api.Test;
 class TypeHierarchyTest {
 
     private static TypeRegistry registry;
-    private static TypeHierarchy hierarchy;
+    private static TypeReader.Hierarchy hierarchy;
 
     @BeforeAll
     static void loadCatalogue() {
-        TypeRegistryBuilder builder = new TypeRegistryBuilder();
-        EtsiTypeCatalogue.addTo(builder);
+        TypeReader builder = new TypeReader();
+        TypeReader.addCatalogue(builder);
         registry = builder.build();
-        hierarchy = new TypeHierarchy(registry);
+        hierarchy = new TypeReader.Hierarchy(registry);
     }
 
     @Test
@@ -53,10 +56,10 @@ class TypeHierarchyTest {
     void recognisesVendorDerivedVnfType() {
         // Reproduces what the bundled packages do: the VNF node declares a vendor type, so matching
         // on the literal string "tosca.nodes.nfv.VNF" would find nothing.
-        TypeRegistryBuilder builder = new TypeRegistryBuilder();
-        EtsiTypeCatalogue.addTo(builder);
+        TypeReader builder = new TypeReader();
+        TypeReader.addCatalogue(builder);
         builder.add(vendorNodeType("ExampleCorp.SimpleWebCnf.1_0", EtsiTypes.VNF), "package");
-        TypeHierarchy local = new TypeHierarchy(builder.build());
+        TypeReader.Hierarchy local = new TypeReader.Hierarchy(builder.build());
 
         assertThat(local.isDerivedFrom("ExampleCorp.SimpleWebCnf.1_0", EtsiTypes.VNF)).isTrue();
         assertThat(local.isDerivedFrom("ExampleCorp.SimpleWebCnf.1_0", EtsiTypes.MCIOP)).isFalse();
@@ -72,10 +75,10 @@ class TypeHierarchyTest {
     @Test
     @DisplayName("a derived_from cycle terminates instead of looping")
     void cyclicDerivedFromTerminates() {
-        TypeRegistryBuilder builder = new TypeRegistryBuilder();
+        TypeReader builder = new TypeReader();
         builder.add(vendorNodeType("A", "B"), "package");
         builder.add(vendorNodeType("B", "A"), "package");
-        TypeHierarchy local = new TypeHierarchy(builder.build());
+        TypeReader.Hierarchy local = new TypeReader.Hierarchy(builder.build());
 
         assertThat(local.ancestry("A")).containsExactly("A", "B");
         assertThat(local.isDerivedFrom("A", EtsiTypes.VNF)).isFalse();

@@ -3,8 +3,7 @@ package com.example.etsi.vnfd.toscatype.bind;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.etsi.vnfd.fixture.Fixtures;
-import com.example.etsi.vnfd.csar.DirectoryCsarReader;
-import com.example.etsi.vnfd.template.converter.YamlService;
+import com.example.etsi.vnfd.services.pkg2template.PackageReader;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
 import com.example.etsi.vnfd.toscatype.node.Mciop;
 import com.example.etsi.vnfd.toscatype.node.NfvNode;
@@ -12,7 +11,7 @@ import com.example.etsi.vnfd.toscatype.node.VduCp;
 import com.example.etsi.vnfd.toscatype.node.VduOsContainerDeployableUnit;
 import com.example.etsi.vnfd.toscatype.node.Vnf;
 import com.example.etsi.vnfd.template.NodeTemplate;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
+import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -20,8 +19,8 @@ import org.junit.jupiter.api.Test;
 class BindSmokeTest {
 
     private Map<String, NfvNode> bind(String pkg) {
-        ServiceToscaTemplate tst = new YamlService().parse(new DirectoryCsarReader(Fixtures.packageDir(pkg)));
-        NodeBinder binder = new NodeBinder(new TypeHierarchy(tst.typeRegistry()), NodeTypes.ALL);
+        ServiceToscaTemplate tst = new PackageReader(Fixtures.packageDir(pkg)).parse();
+        NodeBinder binder = new NodeBinder(new TypeReader.Hierarchy(tst.typeRegistry()), NodeTypes.ALL);
         Map<String, NfvNode> out = new LinkedHashMap<>();
         for (Map.Entry<String, NodeTemplate> e :
                 tst.flavourTemplates().get(0).topologyTemplate().get().nodeTemplates().entrySet()) {

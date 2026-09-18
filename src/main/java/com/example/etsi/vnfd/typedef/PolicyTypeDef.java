@@ -20,7 +20,7 @@ public final class PolicyTypeDef extends AbstractTypeDef {
     private final List<String> targets = new ArrayList<>();
     private final Map<String, Object> triggers = new LinkedHashMap<>();
 
-    PolicyTypeDef(String name) {
+    public PolicyTypeDef(String name) {
         super(name);
     }
 

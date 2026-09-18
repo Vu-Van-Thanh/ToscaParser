@@ -4,7 +4,7 @@ import com.example.etsi.vnfd.toscatype.node.NfvNode;
 import com.example.etsi.vnfd.template.ArtifactDefinition;
 import com.example.etsi.vnfd.template.NodeTemplate;
 import com.example.etsi.vnfd.template.RequirementAssignment;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
+import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import com.example.etsi.vnfd.validation.Findings;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
@@ -30,11 +30,11 @@ public final class NodeBinder {
     private final ConstraintChecker constraints;
 
     /** Binds without reporting: the caller does not want the conformance findings. */
-    public NodeBinder(TypeHierarchy hierarchy, List<Class<? extends NfvNode>> nodeClasses) {
+    public NodeBinder(TypeReader.Hierarchy hierarchy, List<Class<? extends NfvNode>> nodeClasses) {
         this(hierarchy, nodeClasses, new Findings());
     }
 
-    public NodeBinder(TypeHierarchy hierarchy, List<Class<? extends NfvNode>> nodeClasses,
+    public NodeBinder(TypeReader.Hierarchy hierarchy, List<Class<? extends NfvNode>> nodeClasses,
             Findings findings) {
         this.resolver = new NodeTypeResolver(hierarchy, nodeClasses);
         this.defaults = new TypeDefaults(hierarchy);

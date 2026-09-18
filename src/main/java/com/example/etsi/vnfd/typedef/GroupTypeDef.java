@@ -15,7 +15,7 @@ public final class GroupTypeDef extends AbstractTypeDef {
 
     private final List<String> members = new ArrayList<>();
 
-    GroupTypeDef(String name) {
+    public GroupTypeDef(String name) {
         super(name);
     }
 

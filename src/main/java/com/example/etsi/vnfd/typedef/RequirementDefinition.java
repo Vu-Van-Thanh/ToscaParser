@@ -36,7 +36,7 @@ public final class RequirementDefinition {
     private String relationship;
     private List<Object> occurrences;
 
-    RequirementDefinition(String name) {
+    public RequirementDefinition(String name) {
         this.name = name;
     }
 
@@ -102,19 +102,19 @@ public final class RequirementDefinition {
         }
     }
 
-    void setCapability(String capability) {
+    public void setCapability(String capability) {
         this.capability = capability;
     }
 
-    void setNode(String node) {
+    public void setNode(String node) {
         this.node = node;
     }
 
-    void setRelationship(String relationship) {
+    public void setRelationship(String relationship) {
         this.relationship = relationship;
     }
 
-    void setOccurrences(List<Object> occurrences) {
+    public void setOccurrences(List<Object> occurrences) {
         this.occurrences = occurrences;
     }
 

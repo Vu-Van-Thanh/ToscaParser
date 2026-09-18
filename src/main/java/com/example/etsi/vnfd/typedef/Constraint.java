@@ -15,7 +15,7 @@ public final class Constraint {
     private final String rawKey;
     private final Object value;
 
-    Constraint(ConstraintKind kind, String rawKey, Object value) {
+    public Constraint(ConstraintKind kind, String rawKey, Object value) {
         this.kind = kind;
         this.rawKey = rawKey;
         this.value = value;

@@ -2,9 +2,8 @@ package com.example.etsi.vnfd.toscatype.bind;
 
 import com.example.etsi.vnfd.template.value.Literal;
 import com.example.etsi.vnfd.template.value.PropertyValue;
-import com.example.etsi.vnfd.template.value.PropertyValueParser;
+import com.example.etsi.vnfd.services.pkg2template.TemplateReader;
 import com.example.etsi.vnfd.template.value.Quantity;
-import com.example.etsi.vnfd.template.value.ScalarUnitParser;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.BeanProperty;
 import com.fasterxml.jackson.databind.DeserializationContext;
@@ -55,7 +54,7 @@ public final class PropertyValueDeserializer extends JsonDeserializer<PropertyVa
     public PropertyValue<?> deserialize(JsonParser parser, DeserializationContext context)
             throws IOException {
         Object raw = parser.readValueAs(Object.class);
-        PropertyValue<Object> parsed = PropertyValueParser.parse(raw);
+        PropertyValue<Object> parsed = TemplateReader.parsePropertyValue(raw);
         if (!parsed.isResolved()) {
             // An expression still to be evaluated: nothing to convert, and converting would either
             // invent a value or throw away the expression the caller needs later.
@@ -73,7 +72,7 @@ public final class PropertyValueDeserializer extends JsonDeserializer<PropertyVa
             // TOSCA 1.3 clause 3.3.6: "<scalar> <unit>". A non-conformant spelling is still read,
             // with a finding, rather than failing the parse.
             return value instanceof String
-                    ? ScalarUnitParser.parse((String) value).orElse(null)
+                    ? TemplateReader.parseScalarUnit((String) value).orElse(null)
                     : null;
         }
         if (target.isInstance(value)) {

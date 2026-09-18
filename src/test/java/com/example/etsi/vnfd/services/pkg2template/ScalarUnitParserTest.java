@@ -1,7 +1,9 @@
-package com.example.etsi.vnfd.template.value;
+package com.example.etsi.vnfd.services.pkg2template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.etsi.vnfd.template.value.Quantity;
+import com.example.etsi.vnfd.template.value.SizeUnit;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,7 +25,7 @@ class ScalarUnitParserTest {
     })
     @DisplayName("parses TOSCA scalar-unit.size and normalises to bytes")
     void parsesCanonicalLiterals(String text, long expectedBytes) {
-        Optional<Quantity> q = ScalarUnitParser.parse(text);
+        Optional<Quantity> q = TemplateReader.parseScalarUnit(text);
         assertThat(q).isPresent();
         assertThat(q.get().normalizedBytes()).isEqualTo(expectedBytes);
         assertThat(q.get().hasCanonicalSpacing()).isTrue();
@@ -33,8 +35,8 @@ class ScalarUnitParserTest {
     @Test
     @DisplayName("MB and MiB are not the same size")
     void decimalAndBinaryUnitsDiffer() {
-        long mb = ScalarUnitParser.parse("128 MB").orElseThrow(AssertionError::new).normalizedBytes();
-        long mib = ScalarUnitParser.parse("128 MiB").orElseThrow(AssertionError::new).normalizedBytes();
+        long mb = TemplateReader.parseScalarUnit("128 MB").orElseThrow(AssertionError::new).normalizedBytes();
+        long mib = TemplateReader.parseScalarUnit("128 MiB").orElseThrow(AssertionError::new).normalizedBytes();
         assertThat(mb).isEqualTo(128_000_000L);
         assertThat(mib).isEqualTo(134_217_728L);
         assertThat(mib).isNotEqualTo(mb);
@@ -43,7 +45,7 @@ class ScalarUnitParserTest {
     @Test
     @DisplayName("accepts the compact form but flags it: the three bundled fixtures write \"128MB\"")
     void acceptsMissingSpaceButFlagsIt() {
-        Optional<Quantity> q = ScalarUnitParser.parse("128MB");
+        Optional<Quantity> q = TemplateReader.parseScalarUnit("128MB");
         assertThat(q).isPresent();
         assertThat(q.get().normalizedBytes()).isEqualTo(128_000_000L);
         assertThat(q.get().hasCanonicalSpacing())
@@ -55,11 +57,11 @@ class ScalarUnitParserTest {
     @CsvSource({"128", "MiB", "128 XB", "''", "12 8 MiB"})
     @DisplayName("rejects values that are not size literals")
     void rejectsNonSizeLiterals(String text) {
-        assertThat(ScalarUnitParser.parse(text)).isEmpty();
+        assertThat(TemplateReader.parseScalarUnit(text)).isEmpty();
     }
 
     @Test
     void rejectsNull() {
-        assertThat(ScalarUnitParser.parse(null)).isEmpty();
+        assertThat(TemplateReader.parseScalarUnit(null)).isEmpty();
     }
 }

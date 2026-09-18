@@ -19,7 +19,7 @@ public final class ArtifactTypeDef extends AbstractTypeDef {
     private String mimeType;
     private final List<String> fileExt = new ArrayList<>();
 
-    ArtifactTypeDef(String name) {
+    public ArtifactTypeDef(String name) {
         super(name);
     }
 
@@ -44,7 +44,7 @@ public final class ArtifactTypeDef extends AbstractTypeDef {
         return fileExt.stream().anyMatch(ext -> lower.endsWith("." + ext.toLowerCase(Locale.ROOT)));
     }
 
-    void setMimeType(String mimeType) {
+    public void setMimeType(String mimeType) {
         this.mimeType = mimeType;
     }
 }

@@ -16,7 +16,7 @@ public final class InterfaceTypeDef extends AbstractTypeDef {
     private final Map<String, Object> operations = new LinkedHashMap<>();
     private final Map<String, Object> notifications = new LinkedHashMap<>();
 
-    InterfaceTypeDef(String name) {
+    public InterfaceTypeDef(String name) {
         super(name);
     }
 

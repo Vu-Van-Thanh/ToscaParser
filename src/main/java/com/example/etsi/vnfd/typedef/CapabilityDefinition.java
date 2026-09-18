@@ -23,7 +23,7 @@ public final class CapabilityDefinition {
     private final List<String> validSourceTypes = new ArrayList<>();
     private List<Object> occurrences;
 
-    CapabilityDefinition(String name) {
+    public CapabilityDefinition(String name) {
         this.name = name;
     }
 
@@ -56,15 +56,15 @@ public final class CapabilityDefinition {
         return Optional.ofNullable(occurrences);
     }
 
-    void setType(String type) {
+    public void setType(String type) {
         this.type = type;
     }
 
-    void setDescription(String description) {
+    public void setDescription(String description) {
         this.description = description;
     }
 
-    void setOccurrences(List<Object> occurrences) {
+    public void setOccurrences(List<Object> occurrences) {
         this.occurrences = occurrences;
     }
 

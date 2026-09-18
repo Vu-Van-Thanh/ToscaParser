@@ -2,7 +2,7 @@ package com.example.etsi.vnfd.map;
 
 import com.example.etsi.vnfd.template.ArtifactDefinition;
 import com.example.etsi.vnfd.toscatype.node.NfvNode;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
+import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -22,9 +22,9 @@ import java.util.Optional;
  */
 final class ArtifactSelector {
 
-    private final TypeHierarchy hierarchy;
+    private final TypeReader.Hierarchy hierarchy;
 
-    ArtifactSelector(TypeHierarchy hierarchy) {
+    ArtifactSelector(TypeReader.Hierarchy hierarchy) {
         this.hierarchy = hierarchy;
     }
 

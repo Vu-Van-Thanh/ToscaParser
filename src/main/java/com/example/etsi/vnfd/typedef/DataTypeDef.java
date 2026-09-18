@@ -14,7 +14,7 @@ public final class DataTypeDef extends AbstractTypeDef {
 
     private final List<Constraint> constraints = new ArrayList<>();
 
-    DataTypeDef(String name) {
+    public DataTypeDef(String name) {
         super(name);
     }
 

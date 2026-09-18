@@ -2,7 +2,7 @@ package com.example.etsi.vnfd.toscatype.bind;
 
 import com.example.etsi.vnfd.toscatype.node.EtsiNodeType;
 import com.example.etsi.vnfd.toscatype.node.NfvNode;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
+import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,10 +19,10 @@ import java.util.Optional;
  */
 public final class NodeTypeResolver {
 
-    private final TypeHierarchy hierarchy;
+    private final TypeReader.Hierarchy hierarchy;
     private final Map<String, Class<? extends NfvNode>> byEtsiType;
 
-    public NodeTypeResolver(TypeHierarchy hierarchy, List<Class<? extends NfvNode>> classes) {
+    public NodeTypeResolver(TypeReader.Hierarchy hierarchy, List<Class<? extends NfvNode>> classes) {
         this.hierarchy = hierarchy;
         Map<String, Class<? extends NfvNode>> map = new LinkedHashMap<>();
         for (Class<? extends NfvNode> type : classes) {

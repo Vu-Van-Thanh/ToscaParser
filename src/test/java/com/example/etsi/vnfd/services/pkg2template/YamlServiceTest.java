@@ -1,11 +1,16 @@
-package com.example.etsi.vnfd.template;
+package com.example.etsi.vnfd.services.pkg2template;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import com.example.etsi.vnfd.csar.DirectoryCsarReader;
-import com.example.etsi.vnfd.template.converter.YamlService;
+
 import com.example.etsi.vnfd.fixture.Fixtures;
+import com.example.etsi.vnfd.template.ArtifactDefinition;
+import com.example.etsi.vnfd.template.NodeTemplate;
+import com.example.etsi.vnfd.template.PolicyDefinition;
+import com.example.etsi.vnfd.template.ServiceToscaTemplate;
+import com.example.etsi.vnfd.template.SubstitutionMappings;
+import com.example.etsi.vnfd.template.TopologyTemplate;
+import com.example.etsi.vnfd.template.ToscaDescriptorTemplate;
 import com.example.etsi.vnfd.typedef.EtsiTypes;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
 import com.example.etsi.vnfd.validation.Findings;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class YamlServiceTest {
 
     private static ServiceToscaTemplate parse(String packageName) {
-        return new YamlService().parse(new DirectoryCsarReader(Fixtures.packageDir(packageName)), new Findings());
+        return new PackageReader(Fixtures.packageDir(packageName)).parse(new Findings());
     }
 
     private static TopologyTemplate topologyOf(ServiceToscaTemplate tst) {
@@ -47,7 +52,7 @@ class YamlServiceTest {
     @DisplayName("a vendor VNF node type resolves to tosca.nodes.nfv.VNF through the bundled catalogue")
     void vendorVnfTypeResolves() {
         ServiceToscaTemplate tst = parse(Fixtures.SIMPLE_WEB_CNF);
-        TypeHierarchy hierarchy = new TypeHierarchy(tst.typeRegistry());
+        TypeReader.Hierarchy hierarchy = new TypeReader.Hierarchy(tst.typeRegistry());
         NodeTemplate vnf = topologyOf(tst).nodeTemplates().get("VNF");
 
         assertThat(vnf.type()).isEqualTo("ExampleCorp.SimpleWebCnf.1_0");

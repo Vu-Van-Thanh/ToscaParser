@@ -1,13 +1,12 @@
 package com.example.etsi.vnfd;
 
 import com.example.etsi.vnfd.fixture.Fixtures;
-import com.example.etsi.vnfd.csar.DirectoryCsarReader;
-import com.example.etsi.vnfd.template.converter.YamlService;
+import com.example.etsi.vnfd.services.pkg2template.PackageReader;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
 import com.example.etsi.vnfd.toscatype.bind.NodeTypes;
 import com.example.etsi.vnfd.toscatype.node.EtsiNodeType;
 import com.example.etsi.vnfd.typedef.PropertyDef;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
+import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -22,9 +21,8 @@ class DtGen {
 
     @Test
     void generate() throws IOException {
-        ServiceToscaTemplate tst = new YamlService()
-                .parse(new DirectoryCsarReader(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF)));
-        TypeHierarchy h = new TypeHierarchy(tst.typeRegistry());
+        ServiceToscaTemplate tst = new PackageReader(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF)).parse();
+        TypeReader.Hierarchy h = new TypeReader.Hierarchy(tst.typeRegistry());
 
         Set<String> seeds = new LinkedHashSet<>();
         NodeTypes.ALL.forEach(c -> seeds.add(c.getAnnotation(EtsiNodeType.class).value()));
@@ -64,7 +62,7 @@ class DtGen {
         d.keySchema().ifPresent(e -> collect(e, found, todo));
     }
 
-    private String render(String simple, String fqn, TypeHierarchy h) {
+    private String render(String simple, String fqn, TypeReader.Hierarchy h) {
         Map<String, PropertyDef> props = h.effectivePropertiesOfAnyType(fqn);
         StringBuilder b = new StringBuilder();
         Set<String> imports = new TreeSet<>();

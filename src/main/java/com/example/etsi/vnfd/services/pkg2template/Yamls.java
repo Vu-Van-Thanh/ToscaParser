@@ -1,4 +1,4 @@
-package com.example.etsi.vnfd.utils;
+package com.example.etsi.vnfd.services.pkg2template;
 
 import java.util.ArrayList;
 import java.util.Collections;

@@ -1,10 +1,9 @@
 package com.example.etsi.vnfd;
 
-import com.example.etsi.vnfd.csar.DirectoryCsarReader;
 import com.example.etsi.vnfd.map.ParseResult;
 import com.example.etsi.vnfd.map.VnfdLoader;
+import com.example.etsi.vnfd.services.pkg2template.PackageReader;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
-import com.example.etsi.vnfd.template.converter.YamlService;
 import com.example.etsi.vnfd.validation.Findings;
 import java.nio.file.Path;
 
@@ -32,8 +31,7 @@ public final class ToscaParser {
      */
     public static ParseResult parse(Path packageDir) {
         Findings findings = new Findings();
-        ServiceToscaTemplate template =
-                new YamlService().parse(new DirectoryCsarReader(packageDir), findings);
+        ServiceToscaTemplate template = new PackageReader(packageDir).parse(findings);
         return new VnfdLoader().load(template, findings);
     }
 }

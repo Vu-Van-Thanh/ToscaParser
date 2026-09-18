@@ -2,14 +2,13 @@ package com.example.etsi.vnfd.map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.etsi.vnfd.csar.DirectoryCsarReader;
+import com.example.etsi.vnfd.ToscaParser;
 import com.example.etsi.vnfd.fixture.Fixtures;
 import com.example.etsi.vnfd.model.LcmRealizationPath;
 import com.example.etsi.vnfd.model.MciopProfile;
 import com.example.etsi.vnfd.model.Vdu;
 import com.example.etsi.vnfd.model.VnfDf;
 import com.example.etsi.vnfd.model.Vnfd;
-import com.example.etsi.vnfd.template.converter.YamlService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -17,9 +16,7 @@ import org.junit.jupiter.api.Test;
 class VnfdLoaderTest {
 
     private Vnfd parse(String pkg) {
-        return new VnfdLoader()
-                .load(new YamlService().parse(new DirectoryCsarReader(Fixtures.packageDir(pkg))))
-                .getVnfd();
+        return ToscaParser.parse(Fixtures.packageDir(pkg)).getVnfd();
     }
 
     @Test

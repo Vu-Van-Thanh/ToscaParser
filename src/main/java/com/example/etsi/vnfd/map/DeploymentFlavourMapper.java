@@ -8,7 +8,7 @@ import com.example.etsi.vnfd.model.ext.MciopArtifacts;
 import com.example.etsi.vnfd.toscatype.node.Mciop;
 import com.example.etsi.vnfd.toscatype.node.VduOsContainerDeployableUnit;
 import com.example.etsi.vnfd.toscatype.node.Vnf;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
+import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,7 +36,7 @@ final class DeploymentFlavourMapper {
     private final PolicyMapper policies;
     private final MciopMapper mciops;
 
-    DeploymentFlavourMapper(TypeHierarchy hierarchy, ArtifactSelector artifacts, ObjectMapper mapper) {
+    DeploymentFlavourMapper(TypeReader.Hierarchy hierarchy, ArtifactSelector artifacts, ObjectMapper mapper) {
         this.policies = new PolicyMapper(hierarchy, mapper);
         this.mciops = new MciopMapper(artifacts, mapper);
     }

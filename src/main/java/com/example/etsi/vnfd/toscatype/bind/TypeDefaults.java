@@ -1,7 +1,7 @@
 package com.example.etsi.vnfd.toscatype.bind;
 
 import com.example.etsi.vnfd.typedef.PropertyDef;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
+import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -19,9 +19,9 @@ import java.util.Map;
  */
 public final class TypeDefaults {
 
-    private final TypeHierarchy hierarchy;
+    private final TypeReader.Hierarchy hierarchy;
 
-    public TypeDefaults(TypeHierarchy hierarchy) {
+    public TypeDefaults(TypeReader.Hierarchy hierarchy) {
         this.hierarchy = hierarchy;
     }
 

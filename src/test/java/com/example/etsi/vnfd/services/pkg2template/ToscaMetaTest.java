@@ -1,8 +1,9 @@
-package com.example.etsi.vnfd.csar;
+package com.example.etsi.vnfd.services.pkg2template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.etsi.vnfd.fixture.Fixtures;
+import com.example.etsi.vnfd.template.ServiceToscaTemplate;
 import com.example.etsi.vnfd.template.ToscaMeta;
 import com.example.etsi.vnfd.validation.Finding;
 import com.example.etsi.vnfd.validation.Findings;
@@ -13,8 +14,7 @@ import org.junit.jupiter.api.Test;
 class ToscaMetaTest {
 
     private static ToscaMeta parse(String packageName, Findings findings) {
-        DirectoryCsarReader csar = new DirectoryCsarReader(Fixtures.packageDir(packageName));
-        return ToscaMetaReader.parse(csar, findings);
+        return new PackageReader(Fixtures.packageDir(packageName)).parse(findings).meta();
     }
 
     @Test
@@ -59,12 +59,12 @@ class ToscaMetaTest {
     void everyBundledPackageHasReachableEntryDefinitions() {
         for (String pkg : new String[]{Fixtures.SIMPLE_WEB_CNF, Fixtures.REGULAR_CNF,
                 Fixtures.HYBRID_WEB_CNF}) {
-            DirectoryCsarReader csar = new DirectoryCsarReader(Fixtures.packageDir(pkg));
-            ToscaMeta meta = ToscaMetaReader.parse(csar, new Findings());
+            ServiceToscaTemplate tst = new PackageReader(Fixtures.packageDir(pkg)).parse();
 
-            assertThat(csar.read(meta.entryDefinitions()))
+            // The entry template was read, so the file Entry-Definitions names is really there.
+            assertThat(tst.entryTemplate())
                     .as("%s declares Entry-Definitions %s which must exist in the package",
-                            pkg, meta.entryDefinitions())
+                            pkg, tst.meta().entryDefinitions())
                     .isPresent();
         }
     }
@@ -72,12 +72,13 @@ class ToscaMetaTest {
     @Test
     @DisplayName("Other-Definitions may name a file the package does not ship")
     void otherDefinitionsMayBeAbsentFromPackage() {
-        DirectoryCsarReader csar = new DirectoryCsarReader(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF));
-        ToscaMeta meta = ToscaMetaReader.parse(csar, new Findings());
+        ServiceToscaTemplate tst = new PackageReader(
+                Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF)).parse();
 
         // SOL001 V5.4.1 Annex B.2 NOTE 2: the type definitions file "may, but need not, be
         // included in the VNF Package". All three bundled packages reference it without shipping it.
-        assertThat(meta.otherDefinitions()).isNotEmpty();
-        assertThat(csar.read(meta.otherDefinitions().get(0))).isEmpty();
+        assertThat(tst.meta().otherDefinitions()).isNotEmpty();
+        assertThat(tst.descriptorTemplates()).extracting(t -> t.file())
+                .doesNotContain(tst.meta().otherDefinitions().get(0));
     }
 }

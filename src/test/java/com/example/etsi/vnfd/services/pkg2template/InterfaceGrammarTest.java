@@ -1,11 +1,9 @@
-package com.example.etsi.vnfd.template.converter;
+package com.example.etsi.vnfd.services.pkg2template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.etsi.vnfd.template.InterfaceAssignment;
 import com.example.etsi.vnfd.template.NodeTemplate;
-import com.example.etsi.vnfd.utils.ToscaYamlLoader;
-import com.example.etsi.vnfd.utils.Yamls;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -21,10 +19,10 @@ import org.junit.jupiter.api.Test;
 class InterfaceGrammarTest {
 
     private static Map<String, NodeTemplate> parse(String yaml) {
-        Map<String, Object> document = ToscaYamlLoader.loadMapping(
+        Map<String, Object> document = PackageReader.loadMapping(
                 "test.yaml", yaml.getBytes(StandardCharsets.UTF_8));
         Map<String, Object> topology = Yamls.map(document.get("topology_template"));
-        return TopologyConverter.readNodeTemplates(topology.get("node_templates"), "test.yaml");
+        return TemplateReader.readNodeTemplates(topology.get("node_templates"), "test.yaml");
     }
 
     @Test

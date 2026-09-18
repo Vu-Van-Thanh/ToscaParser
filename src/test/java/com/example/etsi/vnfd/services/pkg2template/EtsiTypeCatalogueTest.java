@@ -1,7 +1,16 @@
-package com.example.etsi.vnfd.typedef;
+package com.example.etsi.vnfd.services.pkg2template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.etsi.vnfd.typedef.ArtifactTypeDef;
+import com.example.etsi.vnfd.typedef.EtsiTypes;
+import com.example.etsi.vnfd.typedef.GroupTypeDef;
+import com.example.etsi.vnfd.typedef.InterfaceTypeDef;
+import com.example.etsi.vnfd.typedef.PolicyTypeDef;
+import com.example.etsi.vnfd.typedef.NodeTypeDef;
+import com.example.etsi.vnfd.typedef.PropertyDef;
+import com.example.etsi.vnfd.typedef.RequirementDefinition;
+import com.example.etsi.vnfd.typedef.TypeRegistry;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,15 +21,15 @@ class EtsiTypeCatalogueTest {
 
     @BeforeAll
     static void loadCatalogue() {
-        TypeRegistryBuilder builder = new TypeRegistryBuilder();
-        EtsiTypeCatalogue.addTo(builder);
+        TypeReader builder = new TypeReader();
+        TypeReader.addCatalogue(builder);
         registry = builder.build();
     }
 
     @Test
     @DisplayName("both bundled definition files are loaded, common types first")
     void loadsBothFiles() {
-        assertThat(EtsiTypeCatalogue.documents().keySet())
+        assertThat(TypeReader.documents().keySet())
                 .containsExactly("etsi_nfv_sol001_common_types.yaml", "etsi_nfv_sol001_vnfd_types.yaml");
     }
 
@@ -122,7 +131,7 @@ class EtsiTypeCatalogueTest {
 
         PropertyDef entry = vnfmInfo.entrySchema().orElseThrow(AssertionError::new);
         assertThat(entry.constraints()).isNotEmpty();
-        assertThat(ConstraintEvaluator.validate(entry.constraints().get(0), "GenericVnfm")).isPresent();
-        assertThat(ConstraintEvaluator.validate(entry.constraints().get(0), "0:MyCompany-1.0.0")).isEmpty();
+        assertThat(TypeReader.validate(entry.constraints().get(0), "GenericVnfm")).isPresent();
+        assertThat(TypeReader.validate(entry.constraints().get(0), "0:MyCompany-1.0.0")).isEmpty();
     }
 }

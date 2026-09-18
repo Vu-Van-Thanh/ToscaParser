@@ -11,7 +11,7 @@ import com.example.etsi.vnfd.toscatype.policy.InstantiationLevels;
 import com.example.etsi.vnfd.toscatype.policy.ScalingAspects;
 import com.example.etsi.vnfd.toscatype.policy.VduInstantiationLevels;
 import com.example.etsi.vnfd.typedef.EtsiTypes;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
+import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,10 +34,10 @@ final class PolicyMapper {
     /** SOL001 V5.4.1 clause 6.9.1. Expanded before a policy target is interpreted. */
     private static final String PLACEMENT_GROUP = "tosca.groups.nfv.PlacementGroup";
 
-    private final TypeHierarchy hierarchy;
+    private final TypeReader.Hierarchy hierarchy;
     private final ObjectMapper mapper;
 
-    PolicyMapper(TypeHierarchy hierarchy, ObjectMapper mapper) {
+    PolicyMapper(TypeReader.Hierarchy hierarchy, ObjectMapper mapper) {
         this.hierarchy = hierarchy;
         this.mapper = mapper;
     }

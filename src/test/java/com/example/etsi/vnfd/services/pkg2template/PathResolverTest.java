@@ -1,4 +1,4 @@
-package com.example.etsi.vnfd.csar;
+package com.example.etsi.vnfd.services.pkg2template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -21,7 +21,7 @@ class PathResolverTest {
     })
     @DisplayName("normalises package-internal paths to a canonical form")
     void normalises(String input, String expected) {
-        assertThat(PathResolver.normalize(input)).isEqualTo(expected);
+        assertThat(PackageReader.normalize(input)).isEqualTo(expected);
     }
 
     @Test
@@ -29,7 +29,7 @@ class PathResolverTest {
     void resolvesArtifactRelativeToDeclaringFile() {
         // Exactly the reference used by the bundled SimpleWebCnf package: the Mciop node in
         // Definitions/ points one level up into Artifacts/.
-        String resolved = PathResolver.resolve(
+        String resolved = PackageReader.resolve(
                 "Definitions/ExampleCorp_SimpleWebCnf_df_simple.yaml",
                 "../Artifacts/Charts/simple-web-cnf-1.0.0.tgz");
 
@@ -39,7 +39,7 @@ class PathResolverTest {
     @Test
     @DisplayName("a sibling import resolves inside the same directory")
     void resolvesSiblingImport() {
-        assertThat(PathResolver.resolve(
+        assertThat(PackageReader.resolve(
                 "Definitions/ExampleCorp_SimpleWebCnf_df_simple.yaml",
                 "etsi_nfv_sol001_vnfd_types.yaml"))
                 .isEqualTo("Definitions/etsi_nfv_sol001_vnfd_types.yaml");
@@ -48,7 +48,7 @@ class PathResolverTest {
     @Test
     @DisplayName("a reference from a root-level file stays at the root")
     void resolvesFromRootLevelFile() {
-        assertThat(PathResolver.resolve("main.yaml", "Artifacts/x.tgz")).isEqualTo("Artifacts/x.tgz");
+        assertThat(PackageReader.resolve("main.yaml", "Artifacts/x.tgz")).isEqualTo("Artifacts/x.tgz");
     }
 
     @ParameterizedTest
@@ -60,8 +60,8 @@ class PathResolverTest {
     })
     @DisplayName("refuses paths that climb above the package root")
     void refusesZipSlip(String reference) {
-        assertThatThrownBy(() -> PathResolver.resolve("Definitions/main.yaml", reference))
-                .isInstanceOf(CsarSecurityException.class)
+        assertThatThrownBy(() -> PackageReader.resolve("Definitions/main.yaml", reference))
+                .isInstanceOf(PackageReader.CsarSecurityException.class)
                 .hasMessageContaining("escapes the VNF package root");
     }
 
@@ -70,23 +70,23 @@ class PathResolverTest {
     void climbingToRootIsAllowed() {
         // Every bundled package does this: artifacts in Definitions/ reference ../Artifacts/...
         // Refusing one ".." from a first-level directory would break all of them.
-        assertThat(PathResolver.resolve("Definitions/main.yaml", "../outside.yaml"))
+        assertThat(PackageReader.resolve("Definitions/main.yaml", "../outside.yaml"))
                 .isEqualTo("outside.yaml");
-        assertThat(PathResolver.resolve("Definitions/main.yaml", "../Artifacts/Charts/c.tgz"))
+        assertThat(PackageReader.resolve("Definitions/main.yaml", "../Artifacts/Charts/c.tgz"))
                 .isEqualTo("Artifacts/Charts/c.tgz");
     }
 
     @Test
     @DisplayName("a path that climbs and comes back is fine")
     void allowsClimbThatStaysInside() {
-        assertThat(PathResolver.resolve("Definitions/a/b/main.yaml", "../../../Artifacts/x"))
+        assertThat(PackageReader.resolve("Definitions/a/b/main.yaml", "../../../Artifacts/x"))
                 .isEqualTo("Artifacts/x");
     }
 
     @Test
     void extractsParentAndFileName() {
-        assertThat(PathResolver.parentOf("Definitions/main.yaml")).isEqualTo("Definitions");
-        assertThat(PathResolver.parentOf("main.yaml")).isEmpty();
-        assertThat(PathResolver.fileNameOf("Artifacts/Charts/c.tgz")).isEqualTo("c.tgz");
+        assertThat(PackageReader.parentOf("Definitions/main.yaml")).isEqualTo("Definitions");
+        assertThat(PackageReader.parentOf("main.yaml")).isEmpty();
+        assertThat(PackageReader.fileNameOf("Artifacts/Charts/c.tgz")).isEqualTo("c.tgz");
     }
 }

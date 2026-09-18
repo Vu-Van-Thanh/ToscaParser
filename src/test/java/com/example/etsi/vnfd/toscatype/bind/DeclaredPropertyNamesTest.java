@@ -3,12 +3,11 @@ package com.example.etsi.vnfd.toscatype.bind;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.etsi.vnfd.fixture.Fixtures;
-import com.example.etsi.vnfd.csar.DirectoryCsarReader;
-import com.example.etsi.vnfd.template.converter.YamlService;
+import com.example.etsi.vnfd.services.pkg2template.PackageReader;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
 import com.example.etsi.vnfd.toscatype.node.EtsiNodeType;
 import com.example.etsi.vnfd.toscatype.node.NfvNode;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
+import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -36,9 +35,8 @@ class DeclaredPropertyNamesTest {
     @Test
     @DisplayName("every bound property name is declared by the ETSI type")
     void everyBoundPropertyNameIsDeclared() {
-        ServiceToscaTemplate tst = new YamlService()
-                .parse(new DirectoryCsarReader(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF)));
-        TypeHierarchy hierarchy = new TypeHierarchy(tst.typeRegistry());
+        ServiceToscaTemplate tst = new PackageReader(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF)).parse();
+        TypeReader.Hierarchy hierarchy = new TypeReader.Hierarchy(tst.typeRegistry());
 
         List<String> unknown = new ArrayList<>();
         for (Class<? extends NfvNode> nodeClass : NodeTypes.ALL) {

@@ -18,7 +18,7 @@ public final class Quantity {
     private final SizeUnit unit;
     private final boolean canonicalSpacing;
 
-    Quantity(String originalText, BigDecimal magnitude, SizeUnit unit, boolean canonicalSpacing) {
+    public Quantity(String originalText, BigDecimal magnitude, SizeUnit unit, boolean canonicalSpacing) {
         this.originalText = originalText;
         this.magnitude = magnitude;
         this.unit = unit;

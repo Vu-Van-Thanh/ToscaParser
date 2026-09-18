@@ -126,35 +126,35 @@ public final class TypeRegistry {
                 + groupTypes.size();
     }
 
-    void put(NodeTypeDef type) {
+    public void put(NodeTypeDef type) {
         nodeTypes.put(type.name(), type);
     }
 
-    void put(DataTypeDef type) {
+    public void put(DataTypeDef type) {
         dataTypes.put(type.name(), type);
     }
 
-    void put(ArtifactTypeDef type) {
+    public void put(ArtifactTypeDef type) {
         artifactTypes.put(type.name(), type);
     }
 
-    void put(CapabilityTypeDef type) {
+    public void put(CapabilityTypeDef type) {
         capabilityTypes.put(type.name(), type);
     }
 
-    void put(RelationshipTypeDef type) {
+    public void put(RelationshipTypeDef type) {
         relationshipTypes.put(type.name(), type);
     }
 
-    void put(InterfaceTypeDef type) {
+    public void put(InterfaceTypeDef type) {
         interfaceTypes.put(type.name(), type);
     }
 
-    void put(PolicyTypeDef type) {
+    public void put(PolicyTypeDef type) {
         policyTypes.put(type.name(), type);
     }
 
-    void put(GroupTypeDef type) {
+    public void put(GroupTypeDef type) {
         groupTypes.put(type.name(), type);
     }
 

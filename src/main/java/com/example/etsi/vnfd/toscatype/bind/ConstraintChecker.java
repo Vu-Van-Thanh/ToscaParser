@@ -2,12 +2,10 @@ package com.example.etsi.vnfd.toscatype.bind;
 
 import com.example.etsi.vnfd.template.SourceRef;
 import com.example.etsi.vnfd.template.value.PropertyValue;
-import com.example.etsi.vnfd.template.value.PropertyValueParser;
-import com.example.etsi.vnfd.template.value.ScalarUnitParser;
+import com.example.etsi.vnfd.services.pkg2template.TemplateReader;
 import com.example.etsi.vnfd.typedef.Constraint;
-import com.example.etsi.vnfd.typedef.ConstraintEvaluator;
+import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import com.example.etsi.vnfd.typedef.PropertyDef;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
 import com.example.etsi.vnfd.validation.Findings;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +29,10 @@ public final class ConstraintChecker {
     private static final String CLAUSE_SCALAR_UNIT = "TOSCA Simple Profile YAML 1.3 cl. 3.3.6";
     private static final String SCALAR_UNIT_SIZE = "scalar-unit.size";
 
-    private final TypeHierarchy hierarchy;
+    private final TypeReader.Hierarchy hierarchy;
     private final Findings findings;
 
-    public ConstraintChecker(TypeHierarchy hierarchy, Findings findings) {
+    public ConstraintChecker(TypeReader.Hierarchy hierarchy, Findings findings) {
         this.hierarchy = hierarchy;
         this.findings = findings;
     }
@@ -59,7 +57,7 @@ public final class ConstraintChecker {
                 continue;
             }
 
-            PropertyValue<Object> parsed = PropertyValueParser.parse(assigned);
+            PropertyValue<Object> parsed = TemplateReader.parsePropertyValue(assigned);
             if (!parsed.isResolved()) {
                 continue;
             }
@@ -87,7 +85,7 @@ public final class ConstraintChecker {
         if (!SCALAR_UNIT_SIZE.equals(def.type()) || !(candidate instanceof String)) {
             return;
         }
-        ScalarUnitParser.parse((String) candidate)
+        TemplateReader.parseScalarUnit((String) candidate)
                 .filter(q -> !q.hasCanonicalSpacing())
                 .ifPresent(q -> findings.warn("TOSCA01", CLAUSE_SCALAR_UNIT,
                         "Property " + name + " writes " + q.originalText()
@@ -98,7 +96,7 @@ public final class ConstraintChecker {
     private void checkAll(String name, List<Constraint> constraints, Object candidate,
             SourceRef source) {
         for (Constraint constraint : constraints) {
-            Optional<String> violation = ConstraintEvaluator.validate(constraint, candidate);
+            Optional<String> violation = TypeReader.validate(constraint, candidate);
             violation.ifPresent(message -> findings.warn("TOSCA03", CLAUSE_CONSTRAINTS,
                     "Property " + name + " violates constraint " + message, ref(source)));
         }

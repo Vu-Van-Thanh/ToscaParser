@@ -8,7 +8,7 @@ public final class CapabilityTypeDef extends AbstractTypeDef {
 
     private final List<String> validSourceTypes = new ArrayList<>();
 
-    CapabilityTypeDef(String name) {
+    public CapabilityTypeDef(String name) {
         super(name);
     }
 

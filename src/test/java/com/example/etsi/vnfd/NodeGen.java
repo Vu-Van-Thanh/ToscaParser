@@ -1,13 +1,12 @@
 package com.example.etsi.vnfd;
 
 import com.example.etsi.vnfd.fixture.Fixtures;
-import com.example.etsi.vnfd.csar.DirectoryCsarReader;
-import com.example.etsi.vnfd.template.converter.YamlService;
+import com.example.etsi.vnfd.services.pkg2template.PackageReader;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
 import com.example.etsi.vnfd.typedef.CapabilityDefinition;
 import com.example.etsi.vnfd.typedef.PropertyDef;
 import com.example.etsi.vnfd.typedef.RequirementDefinition;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
+import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -41,15 +40,14 @@ class NodeGen {
         {"tosca.nodes.nfv.Certificate", "Certificate", "CERTIFICATE"},
     };
 
-    private TypeHierarchy h;
+    private TypeReader.Hierarchy h;
     private final Map<String, String> javaName = new LinkedHashMap<>();
     private final Map<String, String> constant = new LinkedHashMap<>();
 
     @Test
     void generate() throws IOException {
-        ServiceToscaTemplate tst = new YamlService()
-                .parse(new DirectoryCsarReader(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF)));
-        h = new TypeHierarchy(tst.typeRegistry());
+        ServiceToscaTemplate tst = new PackageReader(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF)).parse();
+        h = new TypeReader.Hierarchy(tst.typeRegistry());
         for (String[] n : NODES) {
             javaName.put(n[0], n[1]);
             constant.put(n[0], n[2]);

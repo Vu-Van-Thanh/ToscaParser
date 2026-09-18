@@ -22,7 +22,7 @@ import com.example.etsi.vnfd.toscatype.node.Vnf;
 import com.example.etsi.vnfd.toscatype.node.VnfExtCp;
 import com.example.etsi.vnfd.toscatype.node.VnfVirtualLink;
 import com.example.etsi.vnfd.typedef.EtsiTypes;
-import com.example.etsi.vnfd.typedef.TypeHierarchy;
+import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import com.example.etsi.vnfd.validation.Findings;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
@@ -68,7 +68,7 @@ public final class VnfdLoader {
                     + "topology_template; there is nothing to parse into a VNFD");
         }
 
-        TypeHierarchy hierarchy = new TypeHierarchy(template.typeRegistry());
+        TypeReader.Hierarchy hierarchy = new TypeReader.Hierarchy(template.typeRegistry());
         ArtifactSelector artifacts = new ArtifactSelector(hierarchy);
         NodeBinder binder = new NodeBinder(hierarchy, NodeTypes.ALL, findings);
         SwImageMapper swImages = new SwImageMapper(mapper);

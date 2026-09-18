@@ -13,7 +13,7 @@ public final class RelationshipTypeDef extends AbstractTypeDef {
     private final List<String> validTargetTypes = new ArrayList<>();
     private final Map<String, Object> interfaces = new LinkedHashMap<>();
 
-    RelationshipTypeDef(String name) {
+    public RelationshipTypeDef(String name) {
         super(name);
     }
 
