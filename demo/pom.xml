@@ -4,6 +4,18 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <!--
+      2.7.x is the last line that supports Java 11, which is what the library targets. Staying on it
+      means this demo proves the library works on the JDK it claims to, and keeps the javax.* servlet
+      namespace a Spring Boot 2 host application would already be on.
+    -->
+    <version>2.7.18</version>
+    <relativePath/>
+  </parent>
+
   <groupId>com.example.etsi</groupId>
   <artifactId>etsi-vnfd-parser-demo</artifactId>
   <version>0.1.0-SNAPSHOT</version>
@@ -11,16 +23,27 @@
 
   <name>ETSI VNFD Parser Demo</name>
   <description>
-    A consumer of etsi-vnfd-parser: calls the library and serves the parsed VNFD as JSON over HTTP.
+    A Spring Boot consumer of etsi-vnfd-parser: calls the library and serves the parsed VNFD as JSON.
     Deliberately a separate Maven project - it depends on the published artifact, exactly as a host
-    application would, so nothing here can accidentally reach into the library's internals.
+    application would, so nothing here can reach into the library's internals.
   </description>
 
   <properties>
-    <maven.compiler.release>11</maven.compiler.release>
+    <java.version>11</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <jackson.version>2.17.2</jackson.version>
     <parser.version>0.1.0-SNAPSHOT</parser.version>
+    <!--
+      The library is built against Jackson 2.17.2. Overriding the version Spring Boot manages keeps
+      one Jackson on the classpath instead of two.
+    -->
+    <jackson-bom.version>2.17.2</jackson-bom.version>
+    <!--
+      Spring Boot 2.7 manages SnakeYAML 1.30, which has no LoaderOptions.setNestingDepthLimit(int) -
+      that arrived in 2.x. The parser calls it to bound document nesting, so leaving Boot's version
+      in place gets a NoSuchMethodError on the first package read. A host application on Spring Boot
+      2.7 needs this same override.
+    -->
+    <snakeyaml.version>2.2</snakeyaml.version>
   </properties>
 
   <dependencies>
@@ -31,63 +54,23 @@
       <version>${parser.version}</version>
     </dependency>
 
-    <!--
-      The demo builds JSON by hand: the model classes carry no Jackson annotations and their getters
-      return Optional<PropertyValue<T>>, which no default serializer renders usefully. Only the
-      tree API (ObjectNode/ArrayNode) is needed.
-    -->
     <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-      <version>${jackson.version}</version>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
+
     <dependency>
-      <groupId>com.fasterxml.jackson.datatype</groupId>
-      <artifactId>jackson-datatype-jdk8</artifactId>
-      <version>${jackson.version}</version>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
   <build>
     <plugins>
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
-        <version>3.2.0</version>
-        <configuration>
-          <mainClass>com.example.etsi.vnfd.demo.Main</mainClass>
-        </configuration>
-      </plugin>
-      <!-- Copies the runtime classpath next to the jar so run.cmd / run.sh work without a plugin. -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <version>3.6.1</version>
-        <executions>
-          <execution>
-            <id>copy-runtime-deps</id>
-            <phase>package</phase>
-            <goals><goal>copy-dependencies</goal></goals>
-            <configuration>
-              <outputDirectory>${project.build.directory}/lib</outputDirectory>
-              <includeScope>runtime</includeScope>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>3.4.1</version>
-        <configuration>
-          <archive>
-            <manifest>
-              <mainClass>com.example.etsi.vnfd.demo.Main</mainClass>
-              <addClasspath>true</addClasspath>
-              <classpathPrefix>lib/</classpathPrefix>
-            </manifest>
-          </archive>
-        </configuration>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
     </plugins>
   </build>

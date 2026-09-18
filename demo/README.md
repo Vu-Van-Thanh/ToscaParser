@@ -1,8 +1,8 @@
 # etsi-vnfd-parser-demo
 
-A separate Maven project that consumes `etsi-vnfd-parser` **as a published artifact** and serves the
-parsed VNFD as JSON over HTTP. It reaches into nothing: if something here needs library internals,
-that is a signal the library's public surface is wrong.
+A Spring Boot application that consumes `etsi-vnfd-parser` **as a published artifact** and serves the
+parsed VNFD as JSON. It reaches into nothing: if something here needs library internals, that is a
+signal the library's public surface is wrong.
 
 ## Run it
 
@@ -12,26 +12,37 @@ mvn -DskipTests install
 
 # then, from this directory
 cd demo
-mvn compile exec:java                                    # server on http://localhost:8080
-mvn compile exec:java -Dexec.args="--port 9000"
-mvn compile exec:java -Dexec.args="ExampleCorp_HybridWebCnf2_vnf_pkg"        # one package, to stdout
-mvn compile exec:java -Dexec.args="ExampleCorp_HybridWebCnf2_vnf_pkg --json"
+mvn spring-boot:run                                              # http://localhost:8080
+mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=9000
 ```
 
-`exec:java` does **not** recompile on its own — run `compile` in the same command or you will be
-looking at the previous build.
-
-Or build a jar with its dependencies beside it:
+Or build the fat jar:
 
 ```bash
 mvn package
-java -jar target/etsi-vnfd-parser-demo-0.1.0-SNAPSHOT.jar --port 8080
+java -jar target/etsi-vnfd-parser-demo-0.1.0-SNAPSHOT.jar
+java -jar target/etsi-vnfd-parser-demo-0.1.0-SNAPSHOT.jar --server.port=9000
 ```
+
+Sources change in the library? Re-run `mvn -DskipTests install` at the repository root, otherwise
+this app keeps resolving the previously installed jar.
+
+## Two version overrides a host application will need as well
+
+`demo/pom.xml` pins two dependencies above what Spring Boot 2.7 manages:
+
+| Dependency | Boot 2.7 manages | Needed | Why |
+|---|---|---|---|
+| `snakeyaml` | 1.30 | **2.2** | `LoaderOptions.setNestingDepthLimit(int)` arrived in 2.x; the parser calls it to bound document nesting. Without the override the first package read fails with `NoSuchMethodError`. |
+| `jackson-bom` | 2.13.x | **2.17.2** | The library is compiled against 2.17.2; one Jackson on the classpath rather than two. |
+
+This is the kind of thing the demo exists to find. Both were hit here before anything else worked.
 
 ## Endpoints
 
 | Request | Returns |
 |---|---|
+| `GET /health` | where the packages were found and how many |
 | `GET /packages` | every bundled package, `kind: positive \| negative` |
 | `GET /parse?pkg=<name>` | `{ package, hasErrors, vnfd, findings }` — the main one |
 | `GET /parse?dir=<path>` | the same for any package directory on disk |
@@ -40,37 +51,46 @@ java -jar target/etsi-vnfd-parser-demo-0.1.0-SNAPSHOT.jar --port 8080
 | `GET /debug?pkg=<name>` | the TOSCA layer: templates, types, and **unbound node templates** |
 | `GET /parse-all` | one summary row per package |
 
-Add `&pretty=1` to indent.
+Status codes carry the library's own distinction:
 
-A package that cannot be read at all answers **422** with `{ok: false, errorType, error}`. A package
-that reads but breaks a rule answers **200** — the findings carry the verdict. That distinction is
-the library's own and is preserved here.
+- **200** — the package parsed. Findings may still say it breaks a rule; whether that is fatal is
+  the caller's decision, not the parser's.
+- **422** — the package could not be read at all (broken YAML, missing `Entry-Definitions`, a path
+  escaping the package root).
+- **400** — no `pkg` or `dir` given, or an unknown package name.
 
 ### `/debug` is the one to reach for first
 
-It lists every node template with the ETSI type it resolved to, and separately lists the ones that
-resolved to nothing:
-
 ```bash
-curl "localhost:8080/debug?pkg=ExampleCorp_VendorTypeCnf_vnf_pkg&pretty=1"
+curl "localhost:8080/debug?pkg=ExampleCorp_VendorTypeCnf_vnf_pkg" | jq .unboundNodeTemplates
 ```
 
-A node template whose type resolves to no ETSI ancestor is dropped by the binder **silently** —
-no finding, no log line, it simply does not appear in the VNFD. That is the quietest way for a
+A node template whose type resolves to no ETSI ancestor is dropped by the binder **silently** — no
+finding, no log line, it simply does not appear in the VNFD. That is the quietest way for a
 descriptor to lose content, and `unboundNodeTemplates` is the only place it becomes visible.
 
-## Debugging into the library
+## Debugging
 
-Breakpoints in the demo work out of the box. To step **into** the parser, install its sources
-alongside the jar:
+Open `demo/pom.xml` as a project in the IDE and run `Main` in debug mode; breakpoints in the
+controller and in `ParseApi` work immediately.
+
+To step **into** the library, install its sources once:
 
 ```bash
 cd ..
 mvn source:jar install
 ```
 
-Then open `demo/pom.xml` as a project in the IDE and run `Main` in debug mode. Useful places to
-break:
+Or open `ToscaParser` and `demo` as two modules in the same IDE window, which links the source
+directly and skips the reinstall loop entirely.
+
+Remote debugging, when running from the command line:
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.jvmArguments="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+```
+
+Useful breakpoints:
 
 | To understand | Break in |
 |---|---|
@@ -78,23 +98,28 @@ break:
 | how a property became `INPUT_BOUND` | `TemplateReader.parsePropertyValue` |
 | where a finding came from | `SpecRules`, or `ConstraintChecker.check` in `NodeBinder.java` |
 | how one flavour was assembled | `DeploymentFlavourMapper.map` in `VnfdMappers.java` |
+| file reading and path resolution | `PackageReader.readFileAndImports` |
 
 ## What is in here
 
 | File | Role |
 |---|---|
-| `ParseApi.java` | the library called the way a host application would; no HTTP anywhere in it |
+| `ParseApi.java` | the library called the way a host application would; **no HTTP anywhere in it** |
 | `VnfdJson.java` | the serializer, written by hand — see below |
 | `PackageCatalog.java` | finds packages under `docs/etsi-context/testdata/` and `src/test/resources/negative/` |
-| `VnfdHttpServer.java` | the JDK's built-in HTTP server, so the demo adds no framework |
-| `Main.java` | entry point; no arguments starts the server, an argument parses one package |
+| `VnfdController.java` | the thin REST layer; makes no parsing decision of its own |
+| `Main.java` | `@SpringBootApplication` |
+
+Wiring the parser into your own service means copying `ParseApi` and `VnfdJson`. The controller is
+an example, not a dependency.
 
 ### Why the serializer is hand-written
 
 The model classes carry **no Jackson annotations**, and nearly every scalar getter returns
 `Optional<PropertyValue<T>>` — a double wrapper no default serializer renders as anything a reader
-would want. `VnfdJson` walks the getters instead, and registers serializers for `PropertyValue` and
-`Quantity` so a property reads the same nested inside a SOL001 datatype as it does at the top level.
+would want. `VnfdJson` walks the getters instead, and registers serializers for `PropertyValue`,
+`Literal`, `FunctionCall` and `Quantity` so a property reads the same nested inside a SOL001 datatype
+as it does at the top level.
 
 Conventions:
 
