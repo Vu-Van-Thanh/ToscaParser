@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example.etsi</groupId>
+  <artifactId>etsi-vnfd-parser-demo</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>ETSI VNFD Parser Demo</name>
+  <description>
+    A consumer of etsi-vnfd-parser: calls the library and serves the parsed VNFD as JSON over HTTP.
+    Deliberately a separate Maven project - it depends on the published artifact, exactly as a host
+    application would, so nothing here can accidentally reach into the library's internals.
+  </description>
+
+  <properties>
+    <maven.compiler.release>11</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <jackson.version>2.17.2</jackson.version>
+    <parser.version>0.1.0-SNAPSHOT</parser.version>
+  </properties>
+
+  <dependencies>
+    <!-- The library under test, resolved from the local repository (mvn install in the parent dir). -->
+    <dependency>
+      <groupId>com.example.etsi</groupId>
+      <artifactId>etsi-vnfd-parser</artifactId>
+      <version>${parser.version}</version>
+    </dependency>
+
+    <!--
+      The demo builds JSON by hand: the model classes carry no Jackson annotations and their getters
+      return Optional<PropertyValue<T>>, which no default serializer renders usefully. Only the
+      tree API (ObjectNode/ArrayNode) is needed.
+    -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.datatype</groupId>
+      <artifactId>jackson-datatype-jdk8</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.2.0</version>
+        <configuration>
+          <mainClass>com.example.etsi.vnfd.demo.Main</mainClass>
+        </configuration>
+      </plugin>
+      <!-- Copies the runtime classpath next to the jar so run.cmd / run.sh work without a plugin. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.6.1</version>
+        <executions>
+          <execution>
+            <id>copy-runtime-deps</id>
+            <phase>package</phase>
+            <goals><goal>copy-dependencies</goal></goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/lib</outputDirectory>
+              <includeScope>runtime</includeScope>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.1</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>com.example.etsi.vnfd.demo.Main</mainClass>
+              <addClasspath>true</addClasspath>
+              <classpathPrefix>lib/</classpathPrefix>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

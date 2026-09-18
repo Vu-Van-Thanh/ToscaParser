@@ -26,7 +26,6 @@ import com.example.etsi.vnfd.template.value.FunctionName;
 import com.example.etsi.vnfd.template.value.Literal;
 import com.example.etsi.vnfd.template.value.PropertyValue;
 import com.example.etsi.vnfd.template.value.Quantity;
-import com.example.etsi.vnfd.template.value.Resolution;
 import com.example.etsi.vnfd.template.value.SizeUnit;
 import com.example.etsi.vnfd.template.value.Kind;
 import java.math.BigDecimal;
