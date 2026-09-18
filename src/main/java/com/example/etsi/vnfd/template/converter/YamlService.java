@@ -2,7 +2,8 @@ package com.example.etsi.vnfd.template.converter;
 
 import com.example.etsi.vnfd.csar.DirectoryCsarReader;
 import com.example.etsi.vnfd.csar.PathResolver;
-import com.example.etsi.vnfd.csar.ToscaMeta;
+import com.example.etsi.vnfd.csar.ToscaMetaReader;
+import com.example.etsi.vnfd.template.ToscaMeta;
 import com.example.etsi.vnfd.utils.ToscaYamlLoader;
 import com.example.etsi.vnfd.utils.Yamls;
 import com.example.etsi.vnfd.template.NodeTemplate;
@@ -46,7 +47,7 @@ public final class YamlService {
     }
 
     public ServiceToscaTemplate parse(DirectoryCsarReader csar, Findings findings) {
-        ToscaMeta meta = ToscaMeta.parse(csar, findings);
+        ToscaMeta meta = ToscaMetaReader.parse(csar, findings);
 
         List<String> candidateFiles = new ArrayList<>();
         candidateFiles.add(meta.entryDefinitions());

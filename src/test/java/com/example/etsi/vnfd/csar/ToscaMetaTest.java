@@ -1,14 +1,9 @@
 package com.example.etsi.vnfd.csar;
 
-import com.example.etsi.vnfd.fixture.Fixtures;
-import com.example.etsi.vnfd.validation.Finding;
-import com.example.etsi.vnfd.validation.Findings;
-import com.example.etsi.vnfd.validation.Severity;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.etsi.vnfd.fixture.Fixtures;
+import com.example.etsi.vnfd.template.ToscaMeta;
 import com.example.etsi.vnfd.validation.Finding;
 import com.example.etsi.vnfd.validation.Findings;
 import com.example.etsi.vnfd.validation.Severity;
@@ -19,7 +14,7 @@ class ToscaMetaTest {
 
     private static ToscaMeta parse(String packageName, Findings findings) {
         DirectoryCsarReader csar = new DirectoryCsarReader(Fixtures.packageDir(packageName));
-        return ToscaMeta.parse(csar, findings);
+        return ToscaMetaReader.parse(csar, findings);
     }
 
     @Test
@@ -65,7 +60,7 @@ class ToscaMetaTest {
         for (String pkg : new String[]{Fixtures.SIMPLE_WEB_CNF, Fixtures.REGULAR_CNF,
                 Fixtures.HYBRID_WEB_CNF}) {
             DirectoryCsarReader csar = new DirectoryCsarReader(Fixtures.packageDir(pkg));
-            ToscaMeta meta = ToscaMeta.parse(csar, new Findings());
+            ToscaMeta meta = ToscaMetaReader.parse(csar, new Findings());
 
             assertThat(csar.read(meta.entryDefinitions()))
                     .as("%s declares Entry-Definitions %s which must exist in the package",
@@ -78,7 +73,7 @@ class ToscaMetaTest {
     @DisplayName("Other-Definitions may name a file the package does not ship")
     void otherDefinitionsMayBeAbsentFromPackage() {
         DirectoryCsarReader csar = new DirectoryCsarReader(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF));
-        ToscaMeta meta = ToscaMeta.parse(csar, new Findings());
+        ToscaMeta meta = ToscaMetaReader.parse(csar, new Findings());
 
         // SOL001 V5.4.1 Annex B.2 NOTE 2: the type definitions file "may, but need not, be
         // included in the VNF Package". All three bundled packages reference it without shipping it.

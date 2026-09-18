@@ -1,6 +1,5 @@
 package com.example.etsi.vnfd.template;
 
-import com.example.etsi.vnfd.csar.ToscaMeta;
 import com.example.etsi.vnfd.typedef.TypeRegistry;
 import java.util.ArrayList;
 import java.util.Collections;
