@@ -1,0 +1,38 @@
+# Default configuration values for the simple-web-cnf chart.
+#
+# [HELM IMPLEMENTATION] These values are the Helm "config" (ETSI GS NFV-SOL 018
+# V5.4.1, clause 4.2.2.3.2) merged into this chart at "helm install"/"helm
+# upgrade" time. In this VNF package, the effective values.yaml content that
+# is passed to the CISM's Helm-based service interface at instantiation/scale
+# time is generated at runtime by the HelmParamMappingScript artifact
+# (Artifacts/Scripts/lcm_param_mapping.sh), driven by:
+#   - the VNFD's Vdu.OsContainerDeployableUnit.vdu_profile
+#     (min/max_number_of_instances) and mcio_identification_data properties
+#     (ETSI GS NFV-SOL 001 V5.4.1, clause 6.8.13.2), and
+#   - the mapping rules in Artifacts/Scripts/lcm_param_mapping_rules.txt
+#     (tosca.artifacts.nfv.HelmParamMappingRule, clause 6.3.5).
+# This file therefore only defines the chart's own defaults, used when the
+# chart is installed directly with the Helm CLI (e.g. during development)
+# without going through the VNFM/CISM LCM flow.
+
+replicaCount: 1
+
+image:
+  repository: example.invalid/simple-web-cnf
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+  requests:
+    cpu: "250m"
+    memory: "128Mi"
+
+service:
+  type: ClusterIP
+  port: 8080
+
+nameOverride: ""
+fullnameOverride: ""

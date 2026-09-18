@@ -1,0 +1,22 @@
+{{/*
+[KUBERNETES IMPLEMENTATION] Exposes the WebVdu MCIO. This Service is the
+implementation-level realization behind the VduCp "WebCp" node template's
+virtual_binding to WebVdu; the ETSI VDU-CP connectivity semantics
+themselves are TOSCA-represented, not this Kubernetes object
+(ETSI GS NFV-SOL 001 V5.4.1, clause 6.8.5 VduCp / clause 6.8.15 VirtualCp).
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hybrid-web-cnf.fullname" . }}
+  labels:
+    {{- include "hybrid-web-cnf.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "hybrid-web-cnf.selectorLabels" . | nindent 4 }}

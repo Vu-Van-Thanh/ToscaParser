@@ -1,0 +1,5 @@
+TOSCA-Meta-File-Version: 1.0
+Created-By: ExampleCorp NFV Team
+CSAR-Version: 1.1
+Entry-Definitions: Definitions/ExampleCorp_HybridWebCnf_df_simple.yaml
+Other-Definitions: Definitions/etsi_nfv_sol001_vnfd_types.yaml

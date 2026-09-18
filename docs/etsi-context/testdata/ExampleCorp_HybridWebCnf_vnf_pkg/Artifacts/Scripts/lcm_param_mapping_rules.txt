@@ -1,0 +1,9 @@
+# tosca.artifacts.nfv.HelmParamMappingRule contents (ETSI GS NFV-SOL 001
+# V5.4.1, clause 6.3.5): VNF-specific, interpreted only by
+# lcm_param_mapping.sh (the HelmParamMappingScript artifact defined on the
+# same "web_mciop" node template). Format here: "<values.yaml key>=<jq
+# filter over the InstantiateVnfRequest JSON>". This is a
+# [PROJECT-SPECIFIC] convention, not an ETSI-defined syntax.
+
+replicaCount=.extVirtualLinks[0].extCps[0].additionalParams.replicaCount
+imageTag=.additionalParams.imageTag

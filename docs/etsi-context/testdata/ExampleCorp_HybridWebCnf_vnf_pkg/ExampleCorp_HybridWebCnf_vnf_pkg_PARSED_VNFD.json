@@ -1,0 +1,92 @@
+{
+  "_comment": "This is NOT an ETSI-defined file format. It is an illustrative instance of the ETSI GS NFV-IFA 011 V5.4.1 Vnfd information element (clause 7.1.2) as it would exist inside an NFVO/VNFM AFTER PARSING the TOSCA package ExampleCorp_HybridWebCnf_vnf_pkg. Attribute names follow IFA011 exactly ([ETSI SEMANTIC] / [MANO INTERPRETATION]); values are the concrete parse result of the TOSCA node templates in Definitions/ExampleCorp_HybridWebCnf_df_simple.yaml ([TOSCA REPRESENTATION] -> [MANO INTERPRETATION] mapping). See ETSI_VNFD_Helm_Support_and_Parsing.md section 4 for the element-by-element derivation and clause citations.",
+
+  "vnfdId": "3b7d5e2a-9c4a-4a7b-8f6a-1b2c3d4e5f60",
+  "vnfProvider": "ExampleCorp",
+  "vnfProductName": "HybridWebCnf",
+  "vnfSoftwareVersion": "1.0",
+  "vnfdVersion": "1.0",
+  "vnfProductInfoName": "HybridWebCnf",
+  "vnfmInfo": ["GenericVnfm"],
+
+  "_comment_vdu": "IFA011 cl. 7.1.6.2 Vdu information element. Parsed from the WebVdu node template (tosca.nodes.nfv.Vdu.OsContainerDeployableUnit, SOL001 cl. 6.8.13).",
+  "vdu": [
+    {
+      "vduId": "WebVdu",
+      "name": "web-vdu",
+      "description": "Web frontend deployable unit for HybridWebCnf",
+      "osContainerDesc": ["OsContainerDesc-WebContainer"],
+      "virtualComputeDesc": null,
+      "_comment": "virtualComputeDesc is absent (null) because this VDU is realized by OS containers, not a VM - IFA011 cl. 7.1.6.2.2 Note 10."
+    }
+  ],
+
+  "_comment_osContainerDesc": "IFA011 cl. 7.1.6.13 OsContainerDesc information element. Parsed from the WebContainer node template (tosca.nodes.nfv.Vdu.OsContainer, SOL001 cl. 6.8.12), reached via WebVdu's 'container' requirement (SOL001 Table 6.8.13.4-1).",
+  "osContainerDesc": [
+    {
+      "osContainerDescId": "OsContainerDesc-WebContainer",
+      "name": "web-container",
+      "description": "Web frontend OS container (nginx-based application server)",
+      "requestedCpuResources": 250,
+      "cpuResourceLimit": 500,
+      "requestedMemoryResources": 128,
+      "memoryResourceLimit": 256,
+      "swImageDesc": "SwImageDesc-WebImage"
+    }
+  ],
+
+  "_comment_swImageDesc": "IFA011 cl. 7.1.6.5 SwImageDesc information element. Parsed from the 'sw_image' artifact (tosca.artifacts.nfv.SwImage, SOL001 cl. 6.3.1) on the WebContainer node template.",
+  "swImageDesc": [
+    {
+      "id": "SwImageDesc-WebImage",
+      "name": "hybrid-web-cnf-app",
+      "version": "1.0.0",
+      "checksum": { "algorithm": "sha-256", "hash": "0000000000000000000000000000000000000000000000000000000000000" },
+      "containerFormat": "docker",
+      "size": 128,
+      "swImage": "Artifacts/Images/README.txt"
+    }
+  ],
+
+  "_comment_df": "IFA011 cl. 7.1.8.2 VnfDf information element - one entry per TOSCA deployment flavour (here, the single 'simple' flavour).",
+  "df": [
+    {
+      "flavourId": "simple",
+      "description": "Containerized web VNF combining an explicit OsContainer resource description with Helm-based (MCIOP) deployment",
+
+      "_comment_vduProfile": "IFA011 cl. 7.1.8.3 VduProfile, parsed from WebVdu.vdu_profile.",
+      "vduProfile": [
+        {
+          "vduId": "WebVdu",
+          "minNumberOfInstances": 1,
+          "maxNumberOfInstances": 5
+        }
+      ],
+
+      "_comment_mciopProfile": "IFA011 cl. 7.1.8.20 MciopProfile. VnfDf cl. 7.1.8.2.2: 'This attribute shall be present if the DF references (via the vduProfile) containerized workloads based on a MCIOP.' Parsed from the web_mciop node template (tosca.nodes.nfv.Mciop, SOL001 cl. 6.8.14) and its artifacts.",
+      "mciopProfile": [
+        {
+          "mciopId": "web_mciop",
+          "associatedVdu": ["WebVdu"],
+          "mciopParameterMappingRule": "Artifacts/Scripts/lcm_param_mapping_rules.txt",
+          "lcmOpParameterMappingScriptId": "web_param_mapping_script"
+        }
+      ],
+
+      "instantiationLevel": [
+        {
+          "instantiationLevelId": "default",
+          "_comment": "Not modeled explicitly in the example TOSCA (single vduProfile min/max only); an NFVO parser would synthesize a default InstantiationLevel here per IFA011 cl. 7.1.8.2.2 ('If there is only one instantiationLevel entry, it shall be treated as the default')."
+        }
+      ],
+      "defaultInstantiationLevelId": "default"
+    }
+  ],
+
+  "vnfExtCpd": [
+    {
+      "cpdId": "WebCp",
+      "_comment": "Parsed from the WebCp node template (tosca.nodes.nfv.VduCp, SOL001 cl. 6.8.5) exposed via the substitution_mappings virtual_link_mgmt requirement."
+    }
+  ]
+}

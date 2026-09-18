@@ -1,0 +1,179 @@
+# Main VNFD service template - single deployment flavour design with one
+# service template, per ETSI GS NFV-SOL 001 V5.4.1 clause 6.11.3.
+#
+# [TOSCA REPRESENTATION] Node types used and their SOL001 V5.4.1 clauses:
+#   tosca.nodes.nfv.VNF                        - clause 6.8.1
+#   tosca.nodes.nfv.Vdu.OsContainerDeployableUnit - clause 6.8.13
+#   tosca.nodes.nfv.Mciop                      - clause 6.8.14
+#   tosca.nodes.nfv.VduCp                      - clause 6.8.5 (referenced)
+#   tosca.artifacts.nfv.HelmChart              - clause 6.3.3
+#   tosca.artifacts.nfv.HelmParamMappingScript - clause 6.3.4
+#   tosca.artifacts.nfv.HelmParamMappingRule   - clause 6.3.5
+#
+# [ASSUMPTION] Per SOL001 Annex A.23, this design associates the MCIOP
+# directly with a Vdu.OsContainerDeployableUnit and does NOT use
+# tosca.nodes.nfv.Vdu.OsContainer - the OS-container-level resource
+# description (image, cpu/memory limits, ports) lives entirely inside the
+# referenced Helm chart (Artifacts/Charts/simple-web-cnf-1.0.0.tgz), not in
+# the VNFD. This is the "simplified design by using MCIOP" pattern
+# documented in that annex. Clause 6.8.13.7 requires that when a
+# Vdu.OsContainerDeployableUnit is present without any Vdu.OsContainer, at
+# least one tosca.nodes.nfv.Mciop node template shall be present in the
+# VNFD - satisfied here by "web_mciop".
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: >-
+  VNFD for the ExampleCorp SimpleWebCnf VNF, single deployment flavour
+  "simple", realized as a single containerized deployable unit (WebVdu)
+  deployed via a Helm chart (MCIOP).
+
+imports:
+  # [ETSI NORMATIVE] Obtain this file from the official ETSI location cited
+  # in SOL001 V5.4.1 Annex B.2 - do not hand-author it:
+  #   https://forge.etsi.org/rep/nfv/SOL001/raw/v5.4.1/etsi_nfv_sol001_vnfd_types.yaml
+  # Place it alongside this file (or adjust the relative path) before
+  # on-boarding the package; it in turn imports
+  # etsi_nfv_sol001_common_types.yaml (Annex B.2 note 1).
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+data_types:
+  ExampleCorp.datatypes.nfv.SimpleWebCnfInstantiateAdditionalParameters:
+    derived_from: tosca.datatypes.nfv.VnfOperationAdditionalParameters
+    properties:
+      imageTag:
+        type: string
+        required: false
+        default: "1.0.0"
+
+node_types:
+  ExampleCorp.SimpleWebCnf.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 8f6a2e2e-2c3a-4a7a-9a1a-6a3f2b6c9d10
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: SimpleWebCnf
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: simple
+      flavour_description:
+        type: string
+        default: "Single-flavour containerized web VNF realized via MCIOP/Helm chart"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ GenericVnfm ]
+    requirements:
+      - virtual_link_mgmt:
+          capability: tosca.capabilities.nfv.VirtualLinkable
+          relationship: tosca.relationships.nfv.VirtualLinksTo
+          occurrences: [ 0, 1 ]
+    interfaces:
+      Vnflcm:
+        type: tosca.interfaces.nfv.Vnflcm
+
+topology_template:
+  substitution_mappings:
+    node_type: ExampleCorp.SimpleWebCnf.1_0
+    requirements:
+      virtual_link_mgmt: [ WebCp, virtual_link ]
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.SimpleWebCnf.1_0
+      properties:
+        flavour_id: simple
+        descriptor_id: 8f6a2e2e-2c3a-4a7a-9a1a-6a3f2b6c9d10
+        provider: ExampleCorp
+        product_name: SimpleWebCnf
+        software_version: '1.0'
+        descriptor_version: '1.0'
+        flavour_description: "Single-flavour containerized web VNF realized via MCIOP/Helm chart"
+        vnfm_info: [ GenericVnfm ]
+      interfaces:
+        Vnflcm:
+          type: tosca.interfaces.nfv.Vnflcm
+          operations:
+            instantiate:
+              inputs:
+                additional_parameters:
+                  type: ExampleCorp.datatypes.nfv.SimpleWebCnfInstantiateAdditionalParameters
+                  required: false
+
+    # [TOSCA REPRESENTATION] SOL001 clause 6.8.13: Vdu.OsContainerDeployableUnit
+    # "Describes the aggregate of container of a VDU (when realized as OS
+    # containers) which supports the description of the deployment and
+    # operational behavior of a VNFC".
+    WebVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: web-vdu
+        description: "Web frontend deployable unit for SimpleWebCnf"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 5
+        mcio_identification_data:
+          name: simple-web-cnf
+          type: Deployment
+        is_num_of_instances_cluster_based: false
+
+    # [TOSCA REPRESENTATION] SOL001 clause 6.8.5 (VduCp), referenced by the
+    # Vdu.OsContainerDeployableUnit's "associable" capability
+    # (clause 6.8.13.5) via virtual_binding.
+    WebCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+        protocol:
+          - associated_layer_protocol: ipv4
+      requirements:
+        - virtual_binding: WebVdu
+
+    # [TOSCA REPRESENTATION] SOL001 clause 6.8.14: Mciop node type.
+    # "Representation of the object described by the mciop artifact,
+    # capable of being profiled by the properties of the MciopProfile
+    # information element defined in ETSI GS NFV-IFA 011" (clause 6.8.14.1).
+    web_mciop:
+      type: tosca.nodes.nfv.Mciop
+      requirements:
+        - associatedVdu: WebVdu
+      artifacts:
+        # [TOSCA REPRESENTATION] clause 6.3.3 - max one HelmChart artifact
+        # per Mciop node template (clause 6.8.14.7 Additional Requirements).
+        web_helm_chart:
+          description: Helm chart realizing the WebVdu MCIO
+          type: tosca.artifacts.nfv.HelmChart
+          file: ../Artifacts/Charts/simple-web-cnf-1.0.0.tgz
+        # [TOSCA REPRESENTATION] clause 6.3.4 - max one
+        # HelmParamMappingScript per Mciop node template.
+        web_param_mapping_script:
+          description: >-
+            Generates the Helm values.yaml content for web_mciop from the
+            VNF LCM operation request, per lcm_param_mapping_rules.txt.
+          type: tosca.artifacts.nfv.HelmParamMappingScript
+          file: ../Artifacts/Scripts/lcm_param_mapping.sh
+          properties:
+            language: bash
+        # [TOSCA REPRESENTATION] clause 6.3.5 - only valid together with a
+        # HelmParamMappingScript artifact on the same node template
+        # (clause 6.8.14.7: "If there is no artifact definition of type
+        # HelmParamMappingScript there shall be no artifact definition of
+        # type HelmParamMappingRule").
+        web_param_mapping_rule:
+          description: Mapping rules interpreted by web_param_mapping_script
+          type: tosca.artifacts.nfv.HelmParamMappingRule
+          file: ../Artifacts/Scripts/lcm_param_mapping_rules.txt

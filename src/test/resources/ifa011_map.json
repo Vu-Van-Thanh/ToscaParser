@@ -1,0 +1,94 @@
+{
+ "tosca.nodes.nfv.VNF": {
+  "element": "Vnfd",
+  "clause": "7.1.2"
+ },
+ "tosca.nodes.nfv.Cp": {
+  "element": "Cpd",
+  "clause": "7.1.6.3"
+ },
+ "tosca.nodes.nfv.VduCp": {
+  "element": "VduCpd",
+  "clause": "7.1.6.4"
+ },
+ "tosca.nodes.nfv.VirtualCp": {
+  "element": "VirtualCpd",
+  "clause": "7.1.18.2"
+ },
+ "tosca.nodes.nfv.VipCp": {
+  "element": "VipCpd",
+  "clause": "7.1.17.2"
+ },
+ "tosca.nodes.nfv.VnfVirtualLink": {
+  "element": "VnfVirtualLinkDesc",
+  "clause": "7.1.7.2"
+ },
+ "tosca.nodes.nfv.VnfExtCp": {
+  "element": "VnfExtCpd",
+  "clause": "7.1.3.2"
+ },
+ "tosca.nodes.nfv.Vdu.VirtualBlockStorage": {
+  "element": "VirtualStorageDesc",
+  "clause": "7.1.9.4.2"
+ },
+ "tosca.nodes.nfv.Vdu.VirtualObjectStorage": {
+  "element": "VirtualStorageDesc",
+  "clause": "7.1.9.4.2"
+ },
+ "tosca.nodes.nfv.Vdu.VirtualFileStorage": {
+  "element": "VirtualStorageDesc",
+  "clause": "7.1.9.4.2"
+ },
+ "tosca.nodes.nfv.Vdu.Compute": {
+  "element": "VirtualComputeDesc",
+  "clause": "7.1.9.2.2"
+ },
+ "tosca.nodes.nfv.Vdu.OsContainer": {
+  "element": "OsContainerDesc",
+  "clause": "7.1.6.13"
+ },
+ "tosca.artifacts.nfv.SwImage": {
+  "element": "SwImageDesc",
+  "clause": "7.1.6.5"
+ },
+ "tosca.nodes.nfv.Certificate": {
+  "element": "CertificateDesc",
+  "clause": "7.1.19.2",
+  "note": "Table 6.1-1 NOTE 4: the use of certificate management in direct-mode does not require any information in VNFD."
+ },
+ "tosca.policies.nfv.SecurityGroupRule": {
+  "element": "SecurityGroupRule",
+  "clause": "7.1.6.9"
+ },
+ "tosca.datatypes.nfv.VnfConfigurableProperties": {
+  "element": "VnfConfigurableProperties",
+  "clause": "7.1.12"
+ },
+ "tosca.datatypes.nfv.VnfInfoModifiableAttributes": {
+  "element": "VnfInfoModifiableAttributes",
+  "clause": "7.1.14"
+ },
+ "tosca.nodes.nfv.DeployableModule": {
+  "element": "DeployableModule",
+  "clause": "7.1.8.24"
+ },
+ "tosca.nodes.nfv.PaasServiceProfile": {
+  "element": "PaasServiceProfile",
+  "clause": "7.1.8.25"
+ },
+ "tosca.nodes.nfv.PaasServiceRequest": {
+  "element": "PaasServiceRequest",
+  "clause": "7.1.21.2"
+ },
+ "tosca.nodes.nfv.Vdu.OsContainerDeployableUnit": {
+  "element": "Vdu",
+  "clause": "7.1.6.2",
+  "note": "Table 6.1-1 NOTE 1: the Vdu information element is represented as a collection of VduCp, Vdu.Compute (VM based), Vdu.OsContainerDeployableUnit and Vdu.OsContainer (OS container based), and the three Vdu.Virtual*Storage types - no single TOSCA type maps to it."
+ },
+ "tosca.nodes.nfv.Mciop": {
+  "note": "Table 6.1-1 NOTE 3: there is no direct mapping between MciopProfile and tosca.nodes.nfv.Mciop. The deploymentOrder and associatedVdu attributes of MciopProfile map to this node type; affinityOrAntiAffinityGroupId maps to tosca.policies.nfv.AffinityRule or AntiAffinityRule."
+ },
+ "tosca.nodes.nfv.VirtualisedResourceDescriptorProfile": {
+  "note": "Table 6.1-1 NOTE 5: there is no direct mapping; only the associatedVdu attribute maps here."
+ }
+}

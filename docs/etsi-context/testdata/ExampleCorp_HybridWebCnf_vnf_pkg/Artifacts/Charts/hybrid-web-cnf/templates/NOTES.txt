@@ -1,0 +1,4 @@
+hybrid-web-cnf has been deployed as release {{ .Release.Name }}.
+This release realizes the Vdu.OsContainerDeployableUnit "WebVdu" defined in
+the VNFD (ETSI GS NFV-SOL 001 V5.4.1 clause 6.8.13) via the MCIOP node
+template "hybrid_web_mciop" (clause 6.8.14).

@@ -1,0 +1,33 @@
+{{/*
+[KUBERNETES IMPLEMENTATION] This Deployment is the Kubernetes manifest
+generated for the MCIO that realizes the Vdu.OsContainerDeployableUnit
+"WebVdu" (see Definitions/ExampleCorp_SimpleWebCnf_df_simple.yaml).
+mcio_identification_data.type on that VDU is set to "Deployment"
+(ETSI GS NFV-SOL 001 V5.4.1, clause 6.8.13.2), which is why this template,
+rather than e.g. a StatefulSet or DaemonSet, is used here.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "simple-web-cnf.fullname" . }}
+  labels:
+    {{- include "simple-web-cnf.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "simple-web-cnf.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "simple-web-cnf.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: web
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

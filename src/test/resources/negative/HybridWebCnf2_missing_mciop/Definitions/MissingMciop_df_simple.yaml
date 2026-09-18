@@ -1,0 +1,120 @@
+# Negative case for rule C2, and for the reason C2 exists at all.
+#
+# One deployment flavour holding two VDUs on different realization paths:
+#
+#   WebVdu   - requirement `container` -> WebContainer (tosca.nodes.nfv.Vdu.OsContainer)
+#   CacheVdu - no `container` requirement, and NO Mciop node template associates with it
+#
+# IFA011 V5.4.1 clause 7.1.6.2.2 Note 10 is stated per VDU: with osContainerDesc absent,
+# "the MciopProfile associated with the VDU shall be present". CacheVdu violates it.
+#
+# SOL001 V5.4.1 clause 6.8.13.7 asks the same question of the whole service template -
+# "while no node template of type tosca.nodes.nfv.Vdu.OsContainer is present, at least one
+# node template of type tosca.nodes.nfv.Mciop shall be present". WebContainer IS present,
+# so the premise is false and that rule stays silent. Only the per-VDU reading catches this.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: >-
+  Deliberately non-conformant VNFD: a hybrid flavour whose MCIOP-realized VDU has no
+  associated Mciop node template.
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+node_types:
+  ExampleCorp.MissingMciop.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 1f0c5d6e-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: MissingMciop
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: simple
+      flavour_description:
+        type: string
+        default: "Hybrid flavour missing the Mciop for CacheVdu"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+
+topology_template:
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.MissingMciop.1_0
+
+    # Realized through an OsContainer: conformant, and the reason clause 6.8.13.7 is satisfied.
+    WebVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: web-vdu
+        description: "Web frontend, realized MCIO by MCIO"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 3
+        mcio_identification_data:
+          name: missing-mciop-web
+          type: Deployment
+      requirements:
+        - container: WebContainer
+
+    WebContainer:
+      type: tosca.nodes.nfv.Vdu.OsContainer
+      properties:
+        name: web
+        description: "nginx front end"
+        requested_cpu_resources: 100
+        requested_memory_resources: 64 MiB
+      artifacts:
+        sw_image:
+          type: tosca.artifacts.nfv.SwImage
+          file: ../Artifacts/Images/web.tar
+          properties:
+            name: web
+            version: '1.0'
+            container_format: docker
+
+    # No `container` requirement and no Mciop associates with it: nothing describes how this
+    # VDU is realized. This is what C2 reports.
+    CacheVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: cache-vdu
+        description: "Cache tier that should have been realized by a Helm chart"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 2
+        mcio_identification_data:
+          name: missing-mciop-cache
+          type: StatefulSet
+
+    WebCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: WebVdu
+
+    CacheCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: CacheVdu

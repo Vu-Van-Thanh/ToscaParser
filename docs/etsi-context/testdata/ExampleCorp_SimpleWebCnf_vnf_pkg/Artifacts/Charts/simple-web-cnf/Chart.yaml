@@ -1,0 +1,19 @@
+apiVersion: v2
+name: simple-web-cnf
+description: >-
+  Helm chart realizing the MCIOP (Managed Container Infrastructure Object
+  Package) for the ExampleCorp SimpleWebCnf VNF, web-frontend deployable
+  unit (WebVdu). This chart is the artifact referenced by the
+  tosca.artifacts.nfv.HelmChart artifact on the "web_mciop" node template
+  in Definitions/ExampleCorp_SimpleWebCnf_df_simple.yaml.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - cnf
+  - etsi-nfv
+  - mciop
+home: https://example.invalid/simple-web-cnf
+maintainers:
+  - name: ExampleCorp NFV Team
+    email: nfv-team@example.invalid

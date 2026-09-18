@@ -1,0 +1,224 @@
+# Main VNFD service template - single deployment flavour design with one
+# service template, per ETSI GS NFV-SOL 001 V5.4.1 clause 6.11.3.
+#
+# [ETSI SEMANTIC] This is the "regular" / non-simplified containerized VNFD
+# design: the WebVdu deployable unit declares BOTH
+#   (a) an explicit tosca.nodes.nfv.Vdu.OsContainer child node (WebContainer)
+#       describing OS-container resource capacity (cpu/memory/image), and
+#   (b) a tosca.nodes.nfv.Mciop node (web_mciop) carrying the Helm chart
+#       used by the CISM to actually deploy the workload.
+# This combination is explicitly supported by ETSI NFV V5.4.1:
+#   - SOL001 Annex A.22 shows Vdu.OsContainerDeployableUnit node templates
+#     that have BOTH a "container" requirement to a Vdu.OsContainer node
+#     AND an associatedVdu relationship from an Mciop node, in the same
+#     VNFD.
+#   - IFA011 clause 7.1.6.2.2 Note 10: "In case the VDU to be deployed is
+#     realized as OS containers, osContainerDesc should be present. In case
+#     ... osContainerDesc is not present, the MciopProfile associated with
+#     the VDU shall be present" - i.e. osContainerDesc is the RECOMMENDED
+#     (SHOULD) description regardless of whether Helm/MCIOP is also used;
+#     MciopProfile is only a MANDATORY fallback when osContainerDesc is
+#     absent. It does not forbid having both.
+#   - SOL003 V5.4.1 clause 9.5.3.2 (ResourceDefinition, Note 3/4) and the
+#     surrounding grant-handling text: "Requests for resources to be
+#     allocated to MCIOs are derived from the OsContainerDesc resource
+#     templates referenced in the grant request ... An MCIOP profile
+#     contains a list of associated VDUs which in turn reference the
+#     OsContainerDesc resource templates." This is the NFVO-side reason to
+#     keep osContainerDesc even when Helm/MCIOP is the deployment
+#     mechanism: it is what the NFVO/VNFM use to negotiate/validate
+#     capacity (the Grant), independently of how CISM actually renders the
+#     workload via the Helm chart.
+#
+# [TOSCA REPRESENTATION] Node/artifact types used and their SOL001 V5.4.1
+# clauses:
+#   tosca.nodes.nfv.VNF                        - clause 6.8.1
+#   tosca.nodes.nfv.Vdu.OsContainerDeployableUnit - clause 6.8.13
+#   tosca.nodes.nfv.Vdu.OsContainer            - clause 6.8.12
+#   tosca.nodes.nfv.Mciop                      - clause 6.8.14
+#   tosca.nodes.nfv.VduCp                      - clause 6.8.5 (referenced)
+#   tosca.artifacts.nfv.SwImage                - clause 6.3.1
+#   tosca.artifacts.nfv.HelmChart              - clause 6.3.3
+#   tosca.artifacts.nfv.HelmParamMappingScript - clause 6.3.4
+#   tosca.artifacts.nfv.HelmParamMappingRule   - clause 6.3.5
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: >-
+  VNFD for the ExampleCorp HybridWebCnf VNF, single deployment flavour
+  "simple". WebVdu declares an explicit Vdu.OsContainer resource
+  description AND is deployed via a Helm chart referenced from an
+  associated Mciop node (combined OS-container-description + Helm design).
+
+imports:
+  # [ETSI NORMATIVE] Obtain from the official location cited in SOL001
+  # V5.4.1 Annex B.2 - do not hand-author it:
+  #   https://forge.etsi.org/rep/nfv/SOL001/raw/v5.4.1/etsi_nfv_sol001_vnfd_types.yaml
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+data_types:
+  ExampleCorp.datatypes.nfv.HybridWebCnfInstantiateAdditionalParameters:
+    derived_from: tosca.datatypes.nfv.VnfOperationAdditionalParameters
+    properties:
+      imageTag:
+        type: string
+        required: false
+        default: "1.0.0"
+
+node_types:
+  ExampleCorp.HybridWebCnf.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 3b7d5e2a-9c4a-4a7b-8f6a-1b2c3d4e5f60
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: HybridWebCnf
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: simple
+      flavour_description:
+        type: string
+        default: "Containerized web VNF combining an explicit OsContainer resource description with Helm-based (MCIOP) deployment"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ GenericVnfm ]
+    requirements:
+      - virtual_link_mgmt:
+          capability: tosca.capabilities.nfv.VirtualLinkable
+          relationship: tosca.relationships.nfv.VirtualLinksTo
+          occurrences: [ 0, 1 ]
+    interfaces:
+      Vnflcm:
+        type: tosca.interfaces.nfv.Vnflcm
+
+topology_template:
+  substitution_mappings:
+    node_type: ExampleCorp.HybridWebCnf.1_0
+    requirements:
+      virtual_link_mgmt: [ WebCp, virtual_link ]
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.HybridWebCnf.1_0
+      properties:
+        flavour_id: simple
+        descriptor_id: 3b7d5e2a-9c4a-4a7b-8f6a-1b2c3d4e5f60
+        provider: ExampleCorp
+        product_name: HybridWebCnf
+        software_version: '1.0'
+        descriptor_version: '1.0'
+        flavour_description: "Containerized web VNF combining an explicit OsContainer resource description with Helm-based (MCIOP) deployment"
+        vnfm_info: [ GenericVnfm ]
+      interfaces:
+        Vnflcm:
+          type: tosca.interfaces.nfv.Vnflcm
+          operations:
+            instantiate:
+              inputs:
+                additional_parameters:
+                  type: ExampleCorp.datatypes.nfv.HybridWebCnfInstantiateAdditionalParameters
+                  required: false
+
+    # [TOSCA REPRESENTATION] SOL001 clause 6.8.13: represents the Vdu
+    # information element (IFA011 clause 7.1.6.2) for a VNFC realized by
+    # OS containers.
+    WebVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: web-vdu
+        description: "Web frontend deployable unit for HybridWebCnf"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 5
+        mcio_identification_data:
+          name: hybrid-web-cnf
+          type: Deployment
+        is_num_of_instances_cluster_based: false
+      requirements:
+        # [TOSCA REPRESENTATION] SOL001 Table 6.8.13.4-1: "container"
+        # requirement, capability tosca.capabilities.nfv.ContainerDeployable,
+        # relationship tosca.relationships.nfv.DeploysTo. This is what makes
+        # the design "regular" rather than the MCIOP-only simplified design.
+        - container: WebContainer
+
+    # [TOSCA REPRESENTATION] SOL001 clause 6.8.12: "The Vdu.OsContainer node
+    # type represents the OsContainerDesc information element as defined in
+    # ETSI GS NFV-IFA 011" (clause 7.1.6.13).
+    WebContainer:
+      type: tosca.nodes.nfv.Vdu.OsContainer
+      properties:
+        name: web-container
+        description: "Web frontend OS container (nginx-based application server)"
+        requested_cpu_resources: 250
+        cpu_resource_limit: 500
+        requested_memory_resources: 128 MiB
+        memory_resource_limit: 256 MiB
+      artifacts:
+        # [TOSCA REPRESENTATION] SOL001 clause 6.3.1: tosca.artifacts.nfv.SwImage
+        # represents the SwImageDesc information element (IFA011 cl. 7.1.6.5).
+        sw_image:
+          type: tosca.artifacts.nfv.SwImage
+          file: ../Artifacts/Images/README.txt   # replace with the real image reference, see README.txt
+          properties:
+            name: hybrid-web-cnf-app
+            version: "1.0.0"
+            checksum:
+              algorithm: sha-256
+              hash: 0000000000000000000000000000000000000000000000000000000000000
+            container_format: docker
+            size: "128MB"
+
+    # [TOSCA REPRESENTATION] SOL001 clause 6.8.5 (VduCp), referenced from the
+    # Vdu.OsContainerDeployableUnit's "associable" capability (cl. 6.8.13.5).
+    WebCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+        protocol:
+          - associated_layer_protocol: ipv4
+      requirements:
+        - virtual_binding: WebVdu
+
+    # [TOSCA REPRESENTATION] SOL001 clause 6.8.14: Mciop node type,
+    # "capable of being profiled by the properties of the MciopProfile
+    # information element defined in ETSI GS NFV-IFA 011" (cl. 6.8.14.1 /
+    # IFA011 cl. 7.1.8.20). Associated to the SAME WebVdu that also
+    # declares WebContainer above.
+    web_mciop:
+      type: tosca.nodes.nfv.Mciop
+      requirements:
+        - associatedVdu: WebVdu
+      artifacts:
+        # clause 6.3.3 - max one HelmChart artifact per Mciop (cl. 6.8.14.7).
+        web_helm_chart:
+          description: Helm chart realizing the WebVdu MCIO
+          type: tosca.artifacts.nfv.HelmChart
+          file: ../Artifacts/Charts/hybrid-web-cnf-1.0.0.tgz
+        # clause 6.3.4 - max one HelmParamMappingScript per Mciop.
+        web_param_mapping_script:
+          description: >-
+            Generates the Helm values.yaml content for web_mciop from the
+            VNF LCM operation request, per lcm_param_mapping_rules.txt.
+          type: tosca.artifacts.nfv.HelmParamMappingScript
+          file: ../Artifacts/Scripts/lcm_param_mapping.sh
+          properties:
+            language: bash
+        # clause 6.3.5 - only valid together with a HelmParamMappingScript.
+        web_param_mapping_rule:
+          description: Mapping rules interpreted by web_param_mapping_script
+          type: tosca.artifacts.nfv.HelmParamMappingRule
+          file: ../Artifacts/Scripts/lcm_param_mapping_rules.txt
