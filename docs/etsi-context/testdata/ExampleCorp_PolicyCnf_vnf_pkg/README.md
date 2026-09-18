@@ -42,11 +42,9 @@ Expected findings: **none**.
 
 ## Known gaps this package documents
 
-1. **`scaleInfo` is empty** on both levels although each declares `scale_info` with an aspect and a
-   scale level. IFA011 clause 7.1.8.7.2 gives `InstantiationLevel.scaleInfo` 0..N, and the model has
-   the field; `PolicyMapper` does not read it.
-2. **`scalingAspect[].stepDeltas` is empty** although the descriptor declares `step_deltas`.
-3. **`VduScalingAspectDeltas` and `VduInitialDelta` are ignored entirely.** Both are declared here,
-   both parse into the type registry, neither reaches a mapper.
+`VduScalingAspectDeltas` and `VduInitialDelta` are declared here and parse into the type registry,
+but no mapper reads them. IFA011 models the deltas as part of the scaling aspect; nothing in this
+library carries them yet.
 
-All three are valid SOL001. The descriptor is right; the parse is incomplete.
+`scale_info` and `step_deltas` used to be dropped as well - both are carried now, which is what
+`instantiationLevel[].scaleInfo` and `scalingAspect[].stepDeltas` in the output show.

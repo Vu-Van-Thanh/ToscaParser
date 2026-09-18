@@ -28,6 +28,7 @@ import com.example.etsi.vnfd.model.ext.MciopArtifacts;
 import com.example.etsi.vnfd.model.ext.VnfdExtensions;
 import com.example.etsi.vnfd.template.value.FunctionCall;
 import com.example.etsi.vnfd.template.value.Kind;
+import com.example.etsi.vnfd.template.value.Literal;
 import com.example.etsi.vnfd.template.value.PropertyValue;
 import com.example.etsi.vnfd.template.value.Quantity;
 import com.example.etsi.vnfd.validation.Finding;
@@ -92,6 +93,24 @@ public final class VnfdJson {
         module.addSerializer(PropertyValue.class, new JsonSerializer<PropertyValue>() {
             @Override
             public void serialize(PropertyValue value, JsonGenerator gen, SerializerProvider sp)
+                    throws IOException {
+                gen.writeTree(propertyNode(value));
+            }
+        });
+        // The interface registration above is not enough on its own: inside a Map<String,Object>
+        // Jackson sees the runtime class and picks a bean serializer for it, which is how a
+        // PropertyValue ends up rendered as {"resolved":true,"deferred":false}. Both concrete
+        // implementations are registered so the rule holds wherever the value sits.
+        module.addSerializer(Literal.class, new JsonSerializer<Literal>() {
+            @Override
+            public void serialize(Literal value, JsonGenerator gen, SerializerProvider sp)
+                    throws IOException {
+                gen.writeTree(propertyNode(value));
+            }
+        });
+        module.addSerializer(FunctionCall.class, new JsonSerializer<FunctionCall>() {
+            @Override
+            public void serialize(FunctionCall value, JsonGenerator gen, SerializerProvider sp)
                     throws IOException {
                 gen.writeTree(propertyNode(value));
             }

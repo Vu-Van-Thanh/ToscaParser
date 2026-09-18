@@ -13,7 +13,7 @@ re-deriving ETSI mapping rules from scratch each session.
   documented correction (an earlier "Annex A.22" citation was wrong — see the correction note inside).
 - `docs/ETSI_VNFD_Helm_Mapping.md` — the original Helm-chart-only (MCIOP simplified design) VNFD
   mapping writeup.
-- `testdata/` - nine VNF packages. The first three came with this starter kit; the rest were built
+- `testdata/` - ten VNF packages. The first three came with this starter kit; the rest were built
   later to reach code paths nothing else touched. Each has its own `README.md` stating what it
   proves and what the parse is expected to produce.
 
@@ -28,6 +28,7 @@ re-deriving ETSI mapping rules from scratch each session.
   | `ExampleCorp_PolicyCnf_vnf_pkg` | every policy type; real instantiation levels instead of a synthesised one |
   | `ExampleCorp_FunctionsCnf_vnf_pkg` | every TOSCA function of cl. 5.9, plus conformant and non-conformant scalar units |
   | `ExampleCorp_VendorTypeCnf_vnf_pkg` | vendor types two levels below the ETSI ones, so nothing can be matched by name |
+  | `ExampleCorp_LcmCnf_vnf_pkg` | Vnflcm scripts and MCIOP deployment order, both read from places the type file cannot express |
 
   Non-conformant packages live separately, in `src/test/resources/negative/` - one per broken SHALL,
   with a README of their own.

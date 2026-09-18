@@ -19,6 +19,7 @@ import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import com.example.etsi.vnfd.template.ArtifactDefinition;
 import com.example.etsi.vnfd.template.NodeTemplate;
 import com.example.etsi.vnfd.template.PolicyDefinition;
+import com.example.etsi.vnfd.template.RequirementAssignment;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
 import com.example.etsi.vnfd.template.TopologyTemplate;
 import com.example.etsi.vnfd.template.ToscaDescriptorTemplate;
@@ -103,6 +104,10 @@ public final class VnfdLoader {
             Optional<Vnf> vnf = context.vnf();
             if (vnf.isPresent() && !headerRead) {
                 VnfHeaderMapper.map(vnf.get(), builder);
+                // IFA011 clause 7.1.2.2 keeps lifeCycleManagementScript at VNFD level, and SOL001
+                // clause 6.11.2 gives every flavour template the same VNF node type, so the scripts
+                // are read once with the header rather than once per flavour.
+                LcmMapper.map(vnf.get()).forEach(builder::addLifeCycleManagementScript);
                 headerRead = true;
             }
 
@@ -373,6 +378,29 @@ final class FlavourContext {
     /** Drives {@code lcmRealizationPath} and the MCIOP coverage check. */
     List<String> mciopsAssociatedTo(String vduKey) {
         return mciopsByVdu.getOrDefault(vduKey, Collections.emptyList());
+    }
+
+    /**
+     * Targets of a requirement as written, straight off the node template.
+     *
+     * <p>Needed for requirements a node type does not declare, so the bound class has no field for
+     * them. {@code dependency} is the case that matters: SOL001 V5.4.1 clause 6.8.14.7 says it "may
+     * be used towards other Mciop nodes to express the order of deployment", but it comes from
+     * {@code tosca.nodes.Root} rather than from the Mciop type, so nothing generated from the ETSI
+     * type file can carry it.
+     */
+    List<String> rawRequirementTargets(String nodeKey, String requirementName) {
+        NodeTemplate raw = topology.nodeTemplates().get(nodeKey);
+        if (raw == null) {
+            return Collections.emptyList();
+        }
+        List<String> out = new ArrayList<>();
+        for (RequirementAssignment requirement : raw.requirements()) {
+            if (requirementName.equals(requirement.name()) && requirement.node() != null) {
+                out.add(requirement.node());
+            }
+        }
+        return out;
     }
 
     boolean isExternallyExposed(String cpKey) {

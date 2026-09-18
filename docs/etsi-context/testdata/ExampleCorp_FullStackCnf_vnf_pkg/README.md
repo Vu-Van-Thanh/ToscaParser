@@ -35,25 +35,20 @@ swImageDesc          1   [AppContainer]
 vduCpd               2   [AppCp, AppSubCp]      <- VduSubCp derives from VduCp, so it maps too
 vnfExtCpd            1   [AppCp]                <- exposed through substitution_mappings
 intVirtualLinkDesc   1   [SignallingVl]
-virtualStorageDesc   0   <-- GAP
+virtualStorageDesc   3   [AppBlockStorage BLOCK, AppObjectStorage OBJECT, AppFileStorage FILE]
+vipCpd               1   [AppVipCp]    intCpd [AppCp],  vipFunction high_availability
+virtualCpd           1   [AppVirtualCp]  vdu [AppVdu]
+certificateDesc      1   [OamCertificate]  VNFOAM_CERT
+df[0].deployableModule  1  [OptionalModule]  member [AppVdu]
+df[0].virtualLinkProfile 1 [SignallingVl]  max/min bitrate carried
 findings             none
 ```
 
-### Known gaps this package documents
+### The one gap left
 
-These are **expected results today**, recorded so that a change which starts filling them shows up
-as a diff rather than as a surprise:
+**`AppSubCp` loses its sub-port detail.** It maps through the ordinary `VduCp` path, so
+`segmentation_type`, `segmentation_id` and `trunk_binding` are read into the bound node and then go
+no further. IFA011 keeps that information in `Vdu.trunkPort`, which this library does not model.
 
-1. **`virtualStorageDesc` is empty** although three storage node templates are declared and bound.
-   `FlavourContext` buckets them into a `storages` list whose accessor has no caller, and no
-   `StorageMapper` exists. `AppVdu.virtualStorageDesc` does carry the three ids as strings — the
-   references survive, the descriptors do not.
-2. **`VipCp` and `VirtualCp` produce nothing.** They bind and land among the connection points, but
-   they are not `VduCp`, so no `VduCpd` is built and IFA011 `VipCpd` / `VirtualCpd` are never
-   produced. They would only appear if exposed through `substitution_mappings`.
-3. **`DeployableModule` and `Certificate` produce nothing.** They bind, then fall off the end of the
-   classification chain, which has no `else`. `AppVdu.certificateDesc` does carry the id.
-4. **`AppSubCp` loses its sub-port detail.** It maps through the ordinary `VduCp` path, so
-   `segmentation_type`, `segmentation_id` and `trunk_binding` are read but not carried into IFA011.
-
-None of these is a fixture error. The descriptor is conformant SOL001; the parse is incomplete.
+Everything else this package used to document as missing is now mapped: storage, VipCp, VirtualCp,
+DeployableModule, Certificate and the virtual link profile.

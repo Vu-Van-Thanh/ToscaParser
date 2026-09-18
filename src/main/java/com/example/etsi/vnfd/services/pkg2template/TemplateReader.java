@@ -148,6 +148,19 @@ public final class TemplateReader {
                 artifact.setResolvedFile(resolver.apply(artifact.file()));
             }
         }
+        // An operation implementation names a file the same way an artifact does - relative to the
+        // declaring template - so it is resolved the same way. SOL001 clause 6.7.1.1 operations are
+        // where the lifecycle scripts of IFA011 clause 7.1.13.2 come from, and a caller handed one
+        // path rooted at the package and another rooted at Definitions/ cannot use either safely.
+        for (InterfaceAssignment iface : node.interfaces().values()) {
+            for (OperationAssignment operation : iface.operations().values()) {
+                operation.implementation().ifPresent(impl -> {
+                    if (impl.primary() != null) {
+                        impl.setPrimary(resolver.apply(impl.primary()));
+                    }
+                });
+            }
+        }
     }
     // ============================================================================================
     // node_templates

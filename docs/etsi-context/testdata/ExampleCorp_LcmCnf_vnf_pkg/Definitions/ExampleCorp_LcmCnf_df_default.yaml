@@ -1,0 +1,168 @@
+# Lifecycle management scripts and MCIOP deployment order.
+#
+# Two things here that no other fixture exercises.
+#
+# 1. Vnflcm operations carrying an `implementation`.
+#    [ETSI NORMATIVE] SOL001 V5.4.1 clause 6.7.1.1 defines tosca.interfaces.nfv.Vnflcm with an
+#    operation per VNF LCM operation, plus preamble and postamble operations formed as
+#    <base>_start and <base>_end. IFA011 V5.4.1 clause 7.1.13.2 makes LifeCycleManagementScript.script
+#    M,1, so ONLY an operation with an implementation is a script - `instantiate` below declares
+#    inputs and no implementation and must produce nothing.
+#
+# 2. Two Mciops with a dependency between them.
+#    [ETSI NORMATIVE] SOL001 clause 6.8.14.7: "The dependency requirement as defined in
+#    TOSCA-Simple-Profile-YAML-v1.3 may be used towards other Mciop nodes to express the order of
+#    deployment." The requirement comes from tosca.nodes.Root, not from the Mciop node type, so it
+#    cannot appear on anything generated from the ETSI type file - it has to be read off the node
+#    template as written.
+#
+#    app_mciop depends on db_mciop: the database is deployed first.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: >-
+  VNFD for the ExampleCorp LcmCnf VNF. Lifecycle scripts on the VNF node and an ordered pair of
+  MCIOPs.
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+node_types:
+  ExampleCorp.LcmCnf.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 2f9c6b71-4a3d-4e52-b8f0-c71d5e08a394
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: LcmCnf
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: default
+      flavour_description:
+        type: string
+        default: "Ordered MCIOPs with lifecycle scripts"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+    interfaces:
+      Vnflcm:
+        type: tosca.interfaces.nfv.Vnflcm
+
+topology_template:
+
+  substitution_mappings:
+    node_type: ExampleCorp.LcmCnf.1_0
+    requirements:
+      virtual_link_mgmt: [ AppCp, virtual_link ]
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.LcmCnf.1_0
+      interfaces:
+        Vnflcm:
+          type: tosca.interfaces.nfv.Vnflcm
+          operations:
+            # No implementation: declares the shape of the parameters, nothing to run.
+            # Must NOT become a LifeCycleManagementScript.
+            instantiate:
+              inputs:
+                additional_parameters:
+                  type: tosca.datatypes.nfv.VnfOperationAdditionalParameters
+                  required: false
+            # EVENT_START_INSTANTIATION
+            instantiate_start:
+              implementation:
+                primary: ../Artifacts/Scripts/pre_instantiate.sh
+            # EVENT_END_TERMINATION
+            terminate_end:
+              implementation:
+                primary: ../Artifacts/Scripts/post_terminate.sh
+            # EVENT_START_SCALING, and a python script rather than a shell one
+            scale_start:
+              implementation:
+                primary: ../Artifacts/Scripts/pre_scale.py
+
+    # ---------------------------------------------------------------- database tier, deployed first
+    DbVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: db-vdu
+        description: "Database tier"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 1
+        mcio_identification_data:
+          name: lcm-db
+          type: StatefulSet
+
+    db_mciop:
+      type: tosca.nodes.nfv.Mciop
+      requirements:
+        - associatedVdu: DbVdu
+      artifacts:
+        db_chart:
+          type: tosca.artifacts.nfv.HelmChart
+          file: ../Artifacts/Charts/lcm-db-1.0.0.tgz
+        db_param_mapping_script:
+          type: tosca.artifacts.nfv.HelmParamMappingScript
+          file: ../Artifacts/Scripts/param_mapping.sh
+          properties:
+            language: bash
+
+    # ------------------------------------------------------- application tier, deployed afterwards
+    AppVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: app-vdu
+        description: "Application tier, needs the database up first"
+        vdu_profile:
+          min_number_of_instances: 2
+          max_number_of_instances: 8
+        mcio_identification_data:
+          name: lcm-app
+          type: Deployment
+
+    app_mciop:
+      type: tosca.nodes.nfv.Mciop
+      requirements:
+        - associatedVdu: AppVdu
+        # Inherited from tosca.nodes.Root. SOL001 clause 6.8.14.7 gives it this meaning between
+        # Mciop nodes, which is the only place the deployment order is stated.
+        - dependency: db_mciop
+      artifacts:
+        app_chart:
+          type: tosca.artifacts.nfv.HelmChart
+          file: ../Artifacts/Charts/lcm-app-1.0.0.tgz
+        app_param_mapping_script:
+          type: tosca.artifacts.nfv.HelmParamMappingScript
+          file: ../Artifacts/Scripts/param_mapping.sh
+          properties:
+            language: bash
+
+    AppCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: AppVdu
+
+    DbCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: DbVdu

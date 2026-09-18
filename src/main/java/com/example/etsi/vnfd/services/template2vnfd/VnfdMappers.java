@@ -7,6 +7,7 @@ import com.example.etsi.vnfd.model.DeployableModule;
 import com.example.etsi.vnfd.model.InstantiationLevel;
 import com.example.etsi.vnfd.model.LcmOpParameterMappingScript;
 import com.example.etsi.vnfd.model.LcmRealizationPath;
+import com.example.etsi.vnfd.model.LifeCycleManagementScript;
 import com.example.etsi.vnfd.model.MciopProfile;
 import com.example.etsi.vnfd.model.OsContainerDesc;
 import com.example.etsi.vnfd.model.ScaleInfo;
@@ -18,14 +19,19 @@ import com.example.etsi.vnfd.model.VduLevel;
 import com.example.etsi.vnfd.model.VduProfile;
 import com.example.etsi.vnfd.model.VnfDf;
 import com.example.etsi.vnfd.model.VnfExtCpd;
+import com.example.etsi.vnfd.model.VnfLcmOperationsConfiguration;
 import com.example.etsi.vnfd.model.VipCpd;
 import com.example.etsi.vnfd.model.VirtualCpd;
+import com.example.etsi.vnfd.model.VirtualLinkProfile;
 import com.example.etsi.vnfd.model.VirtualStorageDesc;
 import com.example.etsi.vnfd.model.VnfVirtualLinkDesc;
 import com.example.etsi.vnfd.model.Vnfd;
 import com.example.etsi.vnfd.model.ext.MciopArtifacts;
 import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import com.example.etsi.vnfd.template.ArtifactDefinition;
+import com.example.etsi.vnfd.template.ImplementationDefinition;
+import com.example.etsi.vnfd.template.InterfaceAssignment;
+import com.example.etsi.vnfd.template.OperationAssignment;
 import com.example.etsi.vnfd.template.GroupDefinition;
 import com.example.etsi.vnfd.template.ParameterDefinition;
 import com.example.etsi.vnfd.template.PolicyDefinition;
@@ -55,13 +61,22 @@ import com.example.etsi.vnfd.toscatype.policy.InstantiationLevels;
 import com.example.etsi.vnfd.toscatype.policy.ScalingAspects;
 import com.example.etsi.vnfd.toscatype.policy.VduInstantiationLevels;
 import com.example.etsi.vnfd.typedef.EtsiTypes;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.example.etsi.vnfd.validation.Findings;
+import com.example.etsi.vnfd.validation.SourceRef;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -73,7 +88,37 @@ import java.util.function.Consumer;
  */
 public final class VnfdMappers {
 
+    /**
+     * A mapper that writes a {@code PropertyValue} as what the descriptor wrote.
+     *
+     * <p>Several IFA011 attributes are typed as an opaque map - {@code VirtualStorageDesc.storageData},
+     * {@code VirtualLinkProfile.maxBitrateRequirements} - and the bound SOL001 datatype behind them
+     * holds {@code PropertyValue} fields. Converting through the binding mapper would serialise each
+     * one as a bean, {@code {"resolved":true,"deferred":false}}, losing the value outright. Writing
+     * {@code raw()} keeps both cases usable: a literal stays the number or string that was written,
+     * an unresolved function stays the function.
+     */
+    private static final ObjectMapper PLAIN = plainMapper();
+
     private VnfdMappers() {
+    }
+
+    /** A bound SOL001 datatype as a plain map, property values intact. */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> plainMap(Object value) {
+        return value == null ? null : PLAIN.convertValue(value, Map.class);
+    }
+
+    private static ObjectMapper plainMapper() {
+        SimpleModule module = new SimpleModule("plain-property-values");
+        module.addSerializer(PropertyValue.class, new JsonSerializer<PropertyValue>() {
+            @Override
+            public void serialize(PropertyValue value, JsonGenerator gen, SerializerProvider provider)
+                    throws IOException {
+                provider.defaultSerializeValue(value.raw(), gen);
+            }
+        });
+        return ToscaBindModule.mapper().copy().registerModule(module);
     }
 }
 
@@ -385,7 +430,15 @@ final class MciopMapper {
     }
 
     MciopProfile mapProfile(Mciop node) {
+        return mapProfile(node, Collections.emptyMap());
+    }
+
+    MciopProfile mapProfile(Mciop node, Map<String, Integer> deploymentOrder) {
         MciopProfile.Builder builder = MciopProfile.builder(IdRegistry.mciopId(node));
+        Integer order = deploymentOrder.get(node.getKey());
+        if (order != null) {
+            builder.deploymentOrder(order);
+        }
 
         // Table 6.8.14.4-1 gives associatedVdu occurrences [1, UNBOUNDED]; Annex A.23 declares the
         // key twice on one Mciop, which is why the bound field is a list.
@@ -402,6 +455,75 @@ final class MciopMapper {
                 .ifPresent(builder::lcmOpParameterMappingScriptId);
 
         return builder.build();
+    }
+
+
+    /**
+     * Deployment order of the MCIOPs of one flavour, from the {@code dependency} requirements
+     * between them.
+     *
+     * <p>SOL001 V5.4.1 clause 6.8.14.7: "The dependency requirement as defined in
+     * TOSCA-Simple-Profile-YAML-v1.3 may be used towards other Mciop nodes to express the order of
+     * deployment." It says the requirement expresses an order; it does not say how that order
+     * becomes the integer IFA011 clause 7.1.8.20.2 calls {@code deploymentOrder}.
+     *
+     * <p>[ASSUMPTION] A topological rank numbered from zero: an MCIOP depending on nothing is 0, and
+     * one depending on others is one past the highest of them. MCIOPs at the same rank have no
+     * ordering between them, which is what "may be deployed together" looks like as a number.
+     *
+     * <p>Only emitted when at least one dependency exists. A flavour whose MCIOPs declare no order
+     * gets no deploymentOrder at all, rather than every profile claiming rank 0 - saying nothing is
+     * more accurate than saying they are all first.
+     */
+    static Map<String, Integer> deploymentOrder(FlavourContext context, Findings findings) {
+        Map<String, List<String>> dependencies = new LinkedHashMap<>();
+        boolean any = false;
+        for (Mciop mciop : context.mciops()) {
+            List<String> targets = new ArrayList<>();
+            for (String target : context.rawRequirementTargets(mciop.getKey(), "dependency")) {
+                // Clause 6.8.14.7 scopes this to other Mciop nodes; a dependency on anything else
+                // is a TOSCA ordering statement this library has no reading for.
+                if (context.mciops().stream().anyMatch(m -> m.getKey().equals(target))) {
+                    targets.add(target);
+                    any = true;
+                }
+            }
+            dependencies.put(mciop.getKey(), targets);
+        }
+        if (!any) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Integer> ranks = new LinkedHashMap<>();
+        for (String key : dependencies.keySet()) {
+            rank(key, dependencies, ranks, new LinkedHashSet<>(), context, findings);
+        }
+        return ranks;
+    }
+
+    private static int rank(String key, Map<String, List<String>> dependencies,
+            Map<String, Integer> ranks, Set<String> visiting, FlavourContext context,
+            Findings findings) {
+        Integer known = ranks.get(key);
+        if (known != null) {
+            return known;
+        }
+        if (!visiting.add(key)) {
+            // A cycle has no deployment order at all - every member would have to precede itself.
+            findings.error("C30", "SOL001 V5.4.1 cl. 6.8.14.7",
+                    "Mciop " + key + " takes part in a cycle of dependency requirements, so no "
+                            + "order of deployment can be derived",
+                    SourceRef.ofFile(context.template().file()));
+            ranks.put(key, 0);
+            return 0;
+        }
+        int order = 0;
+        for (String target : dependencies.getOrDefault(key, Collections.emptyList())) {
+            order = Math.max(order, rank(target, dependencies, ranks, visiting, context, findings) + 1);
+        }
+        visiting.remove(key);
+        ranks.put(key, order);
+        return order;
     }
 
     /**
@@ -744,9 +866,18 @@ final class DeploymentFlavourMapper {
                     .ifPresent(min -> minInstances.put(profile.getVduId(), min));
         }
 
+        Map<String, Integer> deploymentOrder =
+                MciopMapper.deploymentOrder(context, context.findings());
         for (Mciop mciop : context.mciops()) {
             mciops.check(mciop, context.findings());
-            builder.addMciopProfile(mciops.mapProfile(mciop));
+            builder.addMciopProfile(mciops.mapProfile(mciop, deploymentOrder));
+        }
+
+        // IFA011 clause 7.1.8.2.2 virtualLinkProfile: SOL001 clause 6.8.9 carries the same data as
+        // the vl_profile property of the virtual link, so the profile is read from the node the
+        // flavour references rather than from a separate element.
+        for (VnfVirtualLink link : context.virtualLinks().values()) {
+            builder.addVirtualLinkProfile(virtualLinkProfile(link, affinity));
         }
 
         policies.scalingAspects(context).forEach(builder::addScalingAspect);
@@ -762,6 +893,14 @@ final class DeploymentFlavourMapper {
         }
         levels.forEach(builder::addInstantiationLevel);
         policies.defaultInstantiationLevelId(context).ifPresent(builder::defaultInstantiationLevelId);
+
+        // IFA011 clause 7.1.5.2.2 puts vnfLcmOperationsConfiguration on the flavour, while SOL001
+        // declares lcm_operations_configuration as a property of the VNF node type. Consistent,
+        // since one service template is one flavour (clauses 6.11.2 and 6.11.3).
+        context.vnf()
+                .map(Vnf::getProperties)
+                .map(p -> p.getLcmOperationsConfiguration())
+                .ifPresent(cfg -> builder.vnfLcmOperationsConfiguration(lcmOperationsConfig(cfg)));
 
         Result result = new Result(builder.build());
         SpecRules.flavourIdentified(result.df, context.template().file(), context.findings());
@@ -834,6 +973,61 @@ final class DeploymentFlavourMapper {
                 .map(p -> p.getFlavourDescription())
                 .flatMap(v -> v == null ? Optional.<String>empty() : v.resolved());
     }
+
+    /**
+     * SOL001 {@code lcm_operations_configuration} to IFA011 clause 7.1.5.2
+     * {@code VnfLcmOperationsConfiguration}.
+     *
+     * <p>Twelve sub-elements, each 0..1 and each a bag of operation-specific settings. Carried as
+     * written: nothing here reads an individual setting, and re-modelling twelve tables to pass
+     * them through would be twelve chances to lose one.
+     */
+    @SuppressWarnings("unchecked")
+    private VnfLcmOperationsConfiguration lcmOperationsConfig(Object raw) {
+        VnfLcmOperationsConfiguration.Builder builder = VnfLcmOperationsConfiguration.builder();
+        Map<String, Object> asMap = ToscaBindModule.mapper().convertValue(raw, Map.class);
+        if (asMap != null) {
+            asMap.forEach((attribute, value) -> {
+                if (value instanceof Map) {
+                    builder.mergeOpConfig(attribute, (Map<String, Object>) value);
+                }
+            });
+        }
+        return builder.build();
+    }
+
+    /** SOL001 clause 6.8.9 {@code vl_profile} to IFA011 clause 7.1.8.13 {@code VirtualLinkProfile}. */
+    private VirtualLinkProfile virtualLinkProfile(VnfVirtualLink link,
+            PolicyMapper.AffinityAssignment affinity) {
+        VirtualLinkProfile.Builder builder =
+                VirtualLinkProfile.builder(IdRegistry.virtualLinkDescId(link));
+        if (link.getProperties() != null && link.getProperties().getVlProfile() != null) {
+            com.example.etsi.vnfd.toscatype.data.VlProfile p = link.getProperties().getVlProfile();
+            builder.maxBitrateRequirements(asMap(p.getMaxBitrateRequirements()))
+                   .minBitrateRequirements(asMap(p.getMinBitrateRequirements()))
+                   .qos(asMap(p.getQos()));
+        }
+        // SOL001 Table 6.1-1 NOTE 3: the affinity group lands on the profile, named by a policy
+        // that targets the virtual link.
+        affinity.groupsOf(link.getKey()).forEach(builder::addAffinityGroup);
+        return builder.build();
+    }
+
+    /**
+     * A bound datatype as a plain map, keeping what the descriptor wrote.
+     *
+     * <p>Converting through the binding mapper would serialise each {@code PropertyValue} field as a
+     * bean - {@code {"resolved":true,"deferred":false}} - which loses the value entirely. Writing
+     * {@code raw()} instead keeps both cases usable: a literal stays the number or string the
+     * descriptor wrote, and an unresolved function stays the function, so nothing downstream has to
+     * guess which it was looking at.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> asMap(Object value) {
+        return VnfdMappers.plainMap(value);
+    }
+
+
 
     /** SOL001 Table 6.8.13.2-1 {@code vdu_profile} to IFA011 clause 7.1.8.3 {@code VduProfile}. */
     private VduProfile vduProfile(VduOsContainerDeployableUnit vdu,
@@ -910,9 +1104,8 @@ final class StorageMapper {
         return builder.build();
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> asMap(Object value) {
-        return mapper.convertValue(value, Map.class);
+        return VnfdMappers.plainMap(value);
     }
 }
 
@@ -1014,5 +1207,120 @@ final class ModuleAndCertificateMapper {
             FlavourContext.orEmpty(r.getMember()).forEach(builder::addMember);
         }
         return builder.build();
+    }
+}
+
+/**
+ * SOL001 V5.4.1 clause 6.7.1.1 interface {@code tosca.interfaces.nfv.Vnflcm} to IFA011 V5.4.1
+ * clause 7.1.13.2 {@code LifeCycleManagementScript}.
+ *
+ * <p>Only an operation carrying an {@code implementation} becomes a script. Declaring
+ * {@code inputs} on an operation states the shape of its parameters, not that anything runs -
+ * IFA011 clause 7.1.13.2 makes {@code script} M,1, so an operation with no implementation has
+ * nothing to put there. Every bundled MCIOP package declares {@code instantiate.inputs} and no
+ * implementation, and none of them should produce a script.
+ *
+ * <p>[ASSUMPTION] The operation-to-event table below. SOL001 clause 6.7.1.1 names the operations and
+ * IFA011 clause 7.1.13.2 names the events, but neither prints a lookup between them; the names line
+ * up closely enough to map by pattern, which is a judgement and is labelled as one.
+ *
+ * <p>SOL001 forms each pre- and post-amble as {@code <base>_start} and {@code <base>_end}. A base
+ * operation with no suffix is not an internal VNFM lifecycle event at all: IFA011 describes those
+ * values as "external stimulus detected on a VNFM reference point", i.e. the receipt of the request.
+ */
+final class LcmMapper {
+
+    /** The eighteen internal events of IFA011 Table 7.1.13.2-1, keyed by SOL001 operation base. */
+    private static final Map<String, String> EVENT_BASE;
+
+    static {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("instantiate", "INSTANTIATION");
+        m.put("scale", "SCALING");
+        m.put("scale_to_level", "SCALING_TO_LEVEL");
+        m.put("heal", "HEALING");
+        m.put("terminate", "TERMINATION");
+        m.put("change_flavour", "VNF_FLAVOR_CHANGE");
+        m.put("operate", "VNF_OPERATION_CHANGE");
+        m.put("change_external_connectivity", "VNF_EXT_CONN_CHANGE");
+        m.put("modify_information", "VNFINFO_MODIFICATION");
+        m.put("create_snapshot", "VNF_SNAPSHOT_CREATION");
+        m.put("revert_to_snapshot", "VNF_SNAPSHOT_REVERTINGTO");
+        m.put("change_current_package", "CHANGE_CURRENT_VNF_PACKAGE");
+        EVENT_BASE = Collections.unmodifiableMap(m);
+    }
+
+    private LcmMapper() {
+    }
+
+    /** Every implemented operation of the VNF node template, as a script. */
+    static List<LifeCycleManagementScript> map(Vnf vnf) {
+        List<LifeCycleManagementScript> out = new ArrayList<>();
+        if (vnf == null || vnf.getInterfaces() == null) {
+            return out;
+        }
+        for (Map.Entry<String, InterfaceAssignment> iface : vnf.getInterfaces().entrySet()) {
+            for (Map.Entry<String, OperationAssignment> op : iface.getValue().operations().entrySet()) {
+                script(iface.getKey(), op.getKey(), op.getValue()).ifPresent(out::add);
+            }
+        }
+        return out;
+    }
+
+    private static Optional<LifeCycleManagementScript> script(String interfaceName,
+            String operationName, OperationAssignment operation) {
+        Optional<ImplementationDefinition> implementation = operation.implementation();
+        if (!implementation.isPresent()) {
+            return Optional.empty();
+        }
+        String primary = implementation.get().primary();
+        if (primary == null || primary.isEmpty()) {
+            return Optional.empty();
+        }
+
+        // [ASSUMPTION] lcmScriptId. IFA011 makes it 0..1 - "shall be present if there is the need to
+        // reference this script from another information element" - and says nothing about its form.
+        LifeCycleManagementScript.Builder builder =
+                LifeCycleManagementScript.builder(interfaceName + "." + operationName);
+        builder.script(primary);
+        // [ASSUMPTION] scriptDsl is M,1 in IFA011 and SOL001 declares no language on a Vnflcm
+        // operation, unlike HelmParamMappingScript (clause 6.3.4). The file extension is all the
+        // descriptor offers.
+        dslOf(primary).ifPresent(builder::scriptDsl);
+        eventOf(operationName).ifPresent(builder::addEvent);
+        builder.scriptInput(operation.inputs());
+        return Optional.of(builder.build());
+    }
+
+    /**
+     * The IFA011 event an operation name stands for.
+     *
+     * <p>Empty for a base operation: those correspond to the external stimuli IFA011 lists
+     * separately, and inventing an EVENT_ value for them would state more than the specification
+     * does. The script is still produced - IFA011 NOTE 1 wants at least one of event or
+     * lcmTransitionEvent, and reporting that gap is rule C24's job, not this mapper's.
+     */
+    private static Optional<String> eventOf(String operationName) {
+        if (operationName.endsWith("_start")) {
+            String base = operationName.substring(0, operationName.length() - "_start".length());
+            return Optional.ofNullable(EVENT_BASE.get(base)).map(e -> "EVENT_START_" + e);
+        }
+        if (operationName.endsWith("_end")) {
+            String base = operationName.substring(0, operationName.length() - "_end".length());
+            return Optional.ofNullable(EVENT_BASE.get(base)).map(e -> "EVENT_END_" + e);
+        }
+        return Optional.empty();
+    }
+
+    /** [ASSUMPTION] The interpreter implied by the file extension. */
+    private static Optional<String> dslOf(String path) {
+        String lower = path.toLowerCase(java.util.Locale.ROOT);
+        if (lower.endsWith(".sh") || lower.endsWith(".bash")) {
+            return Optional.of("bash");
+        }
+        if (lower.endsWith(".py")) {
+            return Optional.of("python");
+        }
+        return Optional.empty();
     }
 }
