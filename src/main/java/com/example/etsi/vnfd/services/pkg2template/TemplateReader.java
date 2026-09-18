@@ -26,6 +26,7 @@ import com.example.etsi.vnfd.template.value.FunctionName;
 import com.example.etsi.vnfd.template.value.Literal;
 import com.example.etsi.vnfd.template.value.PropertyValue;
 import com.example.etsi.vnfd.template.value.Quantity;
+import com.example.etsi.vnfd.template.value.Resolution;
 import com.example.etsi.vnfd.template.value.SizeUnit;
 import com.example.etsi.vnfd.template.value.Kind;
 import java.math.BigDecimal;
@@ -553,6 +554,133 @@ public final class TemplateReader {
         return Literal.of(parseLiteralRecursively(raw), raw);
     }
 
+
+    /**
+     * Evaluates {@code concat}, {@code join} and {@code token} when every argument is already a
+     * value.
+     *
+     * <p>SOL001 V5.4.1 clause 5.9 Table 5.9-1 admits the three as intrinsic functions, and TOSCA
+     * Simple Profile YAML 1.3 clause 4.3 defines them over their arguments alone - no node, no
+     * input, no instance. So a call whose arguments are all literals has exactly one answer at
+     * parse time, and leaving it {@code UNRESOLVABLE} would say the descriptor is less determined
+     * than it is.
+     *
+     * <p>A call with one deferred argument takes that argument's resolution rather than its own:
+     * {@code concat: [ "tag-", { get_input: x } ]} is input-bound, not unresolvable, and the
+     * argument tree is kept either way so a consumer can see what is missing.
+     */
+    private static FunctionCall<Object> evaluateIntrinsic(FunctionCall<Object> call) {
+        switch (call.name()) {
+            case CONCAT:
+            case JOIN:
+            case TOKEN:
+                break;
+            default:
+                return call;
+        }
+
+        Resolution weakest = weakestArgumentResolution(call.args());
+        if (weakest != null) {
+            return call.deferredAs(weakest);
+        }
+
+        switch (call.name()) {
+            case CONCAT:
+                return resolvedOrUnchanged(call, concat(call.args()));
+            case JOIN:
+                return resolvedOrUnchanged(call, join(call.args()));
+            case TOKEN:
+                return resolvedOrUnchanged(call, token(call.args()));
+            default:
+                return call;
+        }
+    }
+
+    /**
+     * The resolution to propagate, or null when every argument is a plain value.
+     *
+     * <p>Deferred beats unresolvable: an argument the VNFM will supply says more about why the call
+     * cannot be evaluated than one nobody can.
+     */
+    private static Resolution weakestArgumentResolution(List<PropertyValue<?>> args) {
+        Resolution weakest = null;
+        for (PropertyValue<?> arg : args) {
+            if (arg.isResolved()) {
+                continue;
+            }
+            if (arg.resolution() == Resolution.UNRESOLVABLE && weakest == null) {
+                weakest = Resolution.UNRESOLVABLE;
+            } else if (arg.isDeferred()) {
+                weakest = arg.resolution();
+            }
+        }
+        return weakest;
+    }
+
+    private static FunctionCall<Object> resolvedOrUnchanged(FunctionCall<Object> call, Object value) {
+        return value == null ? call : call.resolvedAs(value);
+    }
+
+    /** TOSCA 1.3 clause 4.3.1: the arguments joined in order, with no separator. */
+    private static Object concat(List<PropertyValue<?>> args) {
+        StringBuilder out = new StringBuilder();
+        for (PropertyValue<?> arg : args) {
+            out.append(text(arg));
+        }
+        return out.toString();
+    }
+
+    /**
+     * TOSCA 1.3 clause 4.3.2: a list joined by an optional delimiter.
+     *
+     * <p>Written {@code { join: [ [ "1", "0", "0" ], "." ] }} - the first argument is the list, the
+     * second the delimiter.
+     */
+    private static Object join(List<PropertyValue<?>> args) {
+        if (args.isEmpty()) {
+            return null;
+        }
+        Object first = args.get(0).resolved().orElse(null);
+        if (!(first instanceof List)) {
+            return null;
+        }
+        String delimiter = args.size() > 1 ? text(args.get(1)) : "";
+        StringBuilder out = new StringBuilder();
+        for (Object element : (List<?>) first) {
+            if (out.length() > 0) {
+                out.append(delimiter);
+            }
+            out.append(element == null ? "" : String.valueOf(element));
+        }
+        return out.toString();
+    }
+
+    /**
+     * TOSCA 1.3 clause 4.3.3: the substring at an index, after splitting on a separator.
+     *
+     * <p>Written {@code { token: [ "north:south:east", ":", 1 ] }}. Out-of-range indexes leave the
+     * call unevaluated rather than raising: a descriptor is described, not corrected.
+     */
+    private static Object token(List<PropertyValue<?>> args) {
+        if (args.size() < 3) {
+            return null;
+        }
+        String source = text(args.get(0));
+        String separator = text(args.get(1));
+        Object rawIndex = args.get(2).resolved().orElse(null);
+        if (separator.isEmpty() || !(rawIndex instanceof Number)) {
+            return null;
+        }
+        String[] parts = source.split(java.util.regex.Pattern.quote(separator), -1);
+        int index = ((Number) rawIndex).intValue();
+        return index < 0 || index >= parts.length ? null : parts[index];
+    }
+
+    private static String text(PropertyValue<?> value) {
+        Object resolved = value.resolved().orElse(null);
+        return resolved == null ? "" : String.valueOf(resolved);
+    }
+
     /** Parses and immediately narrows to a size literal, when the value is one. */
     public static Optional<Quantity> parseAsQuantity(Object raw) {
         if (raw instanceof String) {
@@ -577,7 +705,9 @@ public final class TemplateReader {
 
         Optional<FunctionName> known = FunctionName.fromKey(key);
         if (known.isPresent()) {
-            return Optional.of(FunctionCall.unresolved(known.get(), key, parseArgs(only.getValue()), raw));
+            FunctionCall<Object> call =
+                    FunctionCall.unresolved(known.get(), key, parseArgs(only.getValue()), raw);
+            return Optional.of(evaluateIntrinsic(call));
         }
         if (FunctionName.isKnownNonSol001Function(key)) {
             // Valid TOSCA, but absent from SOL001 Table 5.9-1. Parsed so the caller can report it.

@@ -43,7 +43,10 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import com.example.etsi.vnfd.template.value.FunctionName;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -78,12 +81,26 @@ public final class NodeBinder {
 
     /** Binds a node template, or returns empty when it is not a type this library maps. */
     public Optional<NfvNode> bind(NodeTemplate template) {
+        return bind(template, java.util.Collections.emptyMap());
+    }
+
+    /**
+     * Binds a node template, resolving {@code get_property} against the rest of the topology.
+     *
+     * <p>SOL001 V5.4.1 clause 5.9 Table 5.9-1 admits {@code get_property}, and a chain that stays
+     * inside the descriptor has one answer at parse time - unlike {@code get_input} and
+     * {@code get_attribute}, which need a VNF instance that does not exist yet. Resolving it here
+     * rather than leaving it deferred is the difference between a descriptor that is under-specified
+     * and one that merely refers to itself.
+     */
+    public Optional<NfvNode> bind(NodeTemplate template, Map<String, NodeTemplate> topology) {
         Optional<Class<? extends NfvNode>> target = resolver.resolve(template.type());
         if (!target.isPresent()) {
             return Optional.empty();
         }
 
         Map<String, Object> merged = defaults.apply(template.type(), template.properties());
+        merged = resolveGetProperty(merged, template, topology);
         constraints.check(template.type(), merged, template.source());
         checkArtifacts(template);
 
@@ -125,6 +142,118 @@ public final class NodeBinder {
                     defaults.apply(artifact.type(), artifact.properties()),
                     artifact.source());
         }
+    }
+
+
+    // ============================================================================================
+    // RESOLVING get_property AGAINST THE TOPOLOGY
+    // ============================================================================================
+
+    /**
+     * Replaces every statically resolvable {@code get_property} with the value it names.
+     *
+     * <p>Works on a copy: the DOM keeps what the descriptor wrote, because a reader asking what a
+     * file says should not be handed what this library worked out. Anything that cannot be resolved
+     * - a missing node, a property that is itself a function, a cycle - is left exactly as written,
+     * so it still arrives downstream tagged rather than silently blank.
+     */
+    private Map<String, Object> resolveGetProperty(Map<String, Object> properties,
+            NodeTemplate self, Map<String, NodeTemplate> topology) {
+        if (properties.isEmpty() || topology.isEmpty()) {
+            return properties;
+        }
+        Object resolved = resolveDeep(properties, self, topology, new LinkedHashSet<>());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> out = (Map<String, Object>) resolved;
+        return out;
+    }
+
+    private Object resolveDeep(Object value, NodeTemplate self, Map<String, NodeTemplate> topology,
+            Set<String> visiting) {
+        if (value instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) value;
+            Object direct = resolveCall(map, self, topology, visiting);
+            if (direct != null) {
+                return direct;
+            }
+            Map<String, Object> out = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> e : map.entrySet()) {
+                out.put(String.valueOf(e.getKey()), resolveDeep(e.getValue(), self, topology, visiting));
+            }
+            return out;
+        }
+        if (value instanceof List) {
+            List<Object> out = new ArrayList<>();
+            for (Object element : (List<?>) value) {
+                out.add(resolveDeep(element, self, topology, visiting));
+            }
+            return out;
+        }
+        return value;
+    }
+
+    /** The value a {@code get_property} names, or null when this map is not one, or cannot resolve. */
+    private Object resolveCall(Map<?, ?> map, NodeTemplate self, Map<String, NodeTemplate> topology,
+            Set<String> visiting) {
+        if (map.size() != 1) {
+            return null;
+        }
+        Map.Entry<?, ?> only = map.entrySet().iterator().next();
+        if (!"get_property".equals(only.getKey()) || !(only.getValue() instanceof List)) {
+            return null;
+        }
+        List<?> args = (List<?>) only.getValue();
+        if (args.size() < 2) {
+            return null;
+        }
+
+        // TOSCA 1.3 clause 4.4.1: the first argument names the entity - SELF, or a node template.
+        String entity = String.valueOf(args.get(0));
+        NodeTemplate target = "SELF".equals(entity) || "SELF_NODE".equals(entity)
+                ? self
+                : topology.get(entity);
+        if (target == null) {
+            return null;
+        }
+
+        // A property reading a property of the same node that reads back is a cycle, not a value.
+        String mark = target.name() + "." + args.get(1);
+        if (!visiting.add(mark)) {
+            return null;
+        }
+        try {
+            Map<String, Object> source = defaults.apply(target.type(), target.properties());
+            Object found = source;
+            for (Object step : args.subList(1, args.size())) {
+                if (!(found instanceof Map)) {
+                    return null;
+                }
+                found = ((Map<?, ?>) found).get(String.valueOf(step));
+                if (found == null) {
+                    return null;
+                }
+            }
+            Object value = resolveDeep(found, target, topology, visiting);
+            if (!isFunctionCall(value)) {
+                return value;
+            }
+            // The chain ends on another function. An intrinsic over values still has an answer -
+            // get_property naming a property written as concat of literals, say - so ask the parser,
+            // which evaluates those. Anything it cannot evaluate stays as written.
+            PropertyValue<Object> evaluated = TemplateReader.parsePropertyValue(value);
+            return evaluated.isResolved() ? evaluated.resolved().orElse(null) : null;
+        } finally {
+            visiting.remove(mark);
+        }
+    }
+
+    private static boolean isFunctionCall(Object value) {
+        if (!(value instanceof Map) || ((Map<?, ?>) value).size() != 1) {
+            return false;
+        }
+        Object key = ((Map<?, ?>) value).keySet().iterator().next();
+        return key instanceof String
+                && FunctionName.fromKey((String) key).isPresent();
     }
 
     /** Binds and narrows in one step, for a caller that knows what it is looking for. */

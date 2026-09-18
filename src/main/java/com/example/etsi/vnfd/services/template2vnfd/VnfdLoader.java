@@ -255,7 +255,7 @@ final class FlavourContext {
 
     private void classify() {
         for (NodeTemplate raw : topology.nodeTemplates().values()) {
-            Optional<NfvNode> bound = binder.bind(raw);
+            Optional<NfvNode> bound = binder.bind(raw, topology.nodeTemplates());
             if (!bound.isPresent()) {
                 continue;
             }
