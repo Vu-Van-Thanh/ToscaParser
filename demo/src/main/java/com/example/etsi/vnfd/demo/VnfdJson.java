@@ -11,6 +11,10 @@ import com.example.etsi.vnfd.model.MciopProfile;
 import com.example.etsi.vnfd.model.OsContainerDesc;
 import com.example.etsi.vnfd.model.ScaleInfo;
 import com.example.etsi.vnfd.model.ScalingAspect;
+import com.example.etsi.vnfd.model.ScalingDelta;
+import com.example.etsi.vnfd.model.SecurityGroupRule;
+import com.example.etsi.vnfd.model.Subport;
+import com.example.etsi.vnfd.model.TrunkPortTopology;
 import com.example.etsi.vnfd.model.SwImageDesc;
 import com.example.etsi.vnfd.model.Vdu;
 import com.example.etsi.vnfd.model.VduCpd;
@@ -22,6 +26,8 @@ import com.example.etsi.vnfd.model.VnfDf;
 import com.example.etsi.vnfd.model.VnfExtCpd;
 import com.example.etsi.vnfd.model.VipCpd;
 import com.example.etsi.vnfd.model.VirtualCpd;
+import com.example.etsi.vnfd.model.VirtualLinkBitRateLevel;
+import com.example.etsi.vnfd.model.VnfPackageChangeInfo;
 import com.example.etsi.vnfd.model.VnfVirtualLinkDesc;
 import com.example.etsi.vnfd.model.Vnfd;
 import com.example.etsi.vnfd.model.ext.MciopArtifacts;
@@ -177,6 +183,9 @@ public final class VnfdJson {
         list(n, "vipCpd", vnfd.getVipCpd(), VnfdJson::vipCpd);
         list(n, "virtualCpd", vnfd.getVirtualCpd(), VnfdJson::virtualCpd);
         list(n, "certificateDesc", vnfd.getCertificateDesc(), VnfdJson::certificateDesc);
+        list(n, "securityGroupRule", vnfd.getSecurityGroupRule(), VnfdJson::securityGroupRule);
+        list(n, "vnfPackageChangeInfo", vnfd.getVnfPackageChangeInfo(),
+                VnfdJson::vnfPackageChangeInfo);
 
         // IFA011 names this attribute deploymentFlavour; the JSON field is "df" by project decision.
         list(n, "df", vnfd.getDf(), VnfdJson::df);
@@ -206,6 +215,7 @@ public final class VnfdJson {
         vdu.getMcioIdentificationData()
                 .ifPresent(d -> n.set("mcioIdentificationData", MAPPER.valueToTree(d)));
         property(n, "isNumOfInstancesClusterBased", vdu.getIsNumOfInstancesClusterBased());
+        list(n, "trunkPort", vdu.getTrunkPort(), VnfdJson::trunkPortTopology);
         // [MANO INTERPRETATION] derived, not an IFA011 attribute - see the library javadoc.
         n.put("lcmRealizationPath", vdu.getLcmRealizationPath().name());
         return n;
@@ -353,6 +363,7 @@ public final class VnfdJson {
                 VnfdJson::affinityGroup);
         list(n, "scalingAspect", df.getScalingAspect(), VnfdJson::scalingAspect);
         list(n, "deployableModule", df.getDeployableModule(), VnfdJson::deployableModule);
+        df.getInitialDelta().ifPresent(d -> n.set("initialDelta", scalingDelta(d)));
         df.getVnfLcmOperationsConfiguration().filter(c -> !c.isEmpty()).ifPresent(c -> {
             ObjectNode cfg = object();
             c.getOpConfigs().forEach((k, v) -> cfg.set(k, MAPPER.valueToTree(v)));
@@ -403,6 +414,8 @@ public final class VnfdJson {
         n.put("description", l.getDescription());
         list(n, "vduLevel", l.getVduLevel(), VnfdJson::vduLevel);
         list(n, "scaleInfo", l.getScaleInfo(), VnfdJson::scaleInfo);
+        list(n, "virtualLinkBitRateLevel", l.getVirtualLinkBitRateLevel(),
+                VnfdJson::virtualLinkBitRateLevel);
         if (l.isSynthesised()) {
             // [MANO INTERPRETATION] IFA011 makes instantiationLevel M,1..N, so a descriptor with no
             // InstantiationLevels policy still needs one. Flagged rather than passed off as read.
@@ -433,6 +446,68 @@ public final class VnfdJson {
         put(n, "description", a.getDescription());
         a.getMaxScaleLevel().ifPresent(v -> n.put("maxScaleLevel", v));
         strings(n, "stepDeltas", a.getStepDeltas());
+        list(n, "deltas", a.getDeltas(), VnfdJson::scalingDelta);
+        return n;
+    }
+
+    /** IFA011 V5.4.1 clause 7.1.10.4. */
+    public static ObjectNode scalingDelta(ScalingDelta d) {
+        ObjectNode n = object();
+        n.put("scalingDeltaId", d.getScalingDeltaId());
+        list(n, "vduDelta", d.getVduDelta(), VnfdJson::vduLevel);
+        list(n, "virtualLinkBitRateDelta", d.getVirtualLinkBitRateDelta(),
+                VnfdJson::virtualLinkBitRateLevel);
+        return n;
+    }
+
+    /** IFA011 V5.4.1 clause 7.1.10.5. */
+    public static ObjectNode virtualLinkBitRateLevel(VirtualLinkBitRateLevel l) {
+        ObjectNode n = object();
+        n.put("vnfVirtualLinkDescId", l.getVnfVirtualLinkDescId());
+        map(n, "bitrateRequirements", l.getBitrateRequirements());
+        return n;
+    }
+
+    /** IFA011 V5.4.1 clause 7.1.6.11. */
+    public static ObjectNode trunkPortTopology(TrunkPortTopology t) {
+        ObjectNode n = object();
+        n.put("parentPortCpd", t.getParentPortCpd());
+        list(n, "subportList", t.getSubportList(), VnfdJson::subport);
+        return n;
+    }
+
+    /** IFA011 V5.4.1 clause 7.1.6.12. */
+    public static ObjectNode subport(Subport p) {
+        ObjectNode n = object();
+        n.put("subportCpd", p.getSubportCpd());
+        property(n, "segmentationType", p.getSegmentationType());
+        property(n, "segmentationId", p.getSegmentationId());
+        return n;
+    }
+
+    /** IFA011 V5.4.1 clause 7.1.6.9. */
+    public static ObjectNode securityGroupRule(SecurityGroupRule r) {
+        ObjectNode n = object();
+        n.put("securityGroupRuleId", r.getSecurityGroupRuleId());
+        property(n, "description", r.getDescription());
+        property(n, "direction", r.getDirection());
+        property(n, "etherType", r.getEtherType());
+        property(n, "protocol", r.getProtocol());
+        property(n, "portRangeMin", r.getPortRangeMin());
+        property(n, "portRangeMax", r.getPortRangeMax());
+        strings(n, "_targets", r.getTargets());
+        return n;
+    }
+
+    /** IFA011 V5.4.1 clause 7.1.15.2. */
+    public static ObjectNode vnfPackageChangeInfo(VnfPackageChangeInfo c) {
+        ObjectNode n = object();
+        n.put("changeId", c.getChangeId());
+        maps(n, "selector", c.getSelector());
+        property(n, "modificationQualifier", c.getModificationQualifier());
+        property(n, "additionalModificationDescription", c.getAdditionalModificationDescription());
+        maps(n, "componentMapping", c.getComponentMapping());
+        property(n, "destinationFlavourId", c.getDestinationFlavourId());
         return n;
     }
 

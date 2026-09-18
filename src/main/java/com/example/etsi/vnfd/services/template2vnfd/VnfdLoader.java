@@ -1,8 +1,10 @@
 package com.example.etsi.vnfd.services.template2vnfd;
 
 import com.example.etsi.vnfd.model.LcmRealizationPath;
+import com.example.etsi.vnfd.model.LifeCycleManagementScript;
 import com.example.etsi.vnfd.ParseResult;
 import com.example.etsi.vnfd.model.OsContainerDesc;
+import com.example.etsi.vnfd.model.SecurityGroupRule;
 import com.example.etsi.vnfd.model.SwImageDesc;
 import com.example.etsi.vnfd.model.Vdu;
 import com.example.etsi.vnfd.model.CertificateDesc;
@@ -11,6 +13,7 @@ import com.example.etsi.vnfd.model.VnfExtCpd;
 import com.example.etsi.vnfd.model.VipCpd;
 import com.example.etsi.vnfd.model.VirtualCpd;
 import com.example.etsi.vnfd.model.VirtualStorageDesc;
+import com.example.etsi.vnfd.model.VnfPackageChangeInfo;
 import com.example.etsi.vnfd.model.VnfVirtualLinkDesc;
 import com.example.etsi.vnfd.model.Vnfd;
 import com.example.etsi.vnfd.model.ext.MciopArtifacts;
@@ -96,6 +99,8 @@ public final class VnfdLoader {
         Merged merged = new Merged();
         Set<String> mciopIds = new LinkedHashSet<>();
         Map<String, MciopArtifacts> mciopArtifacts = new LinkedHashMap<>();
+        Map<String, SecurityGroupRule> securityGroupRules = new LinkedHashMap<>();
+        Map<String, VnfPackageChangeInfo> packageChanges = new LinkedHashMap<>();
         boolean headerRead = false;
 
         for (ToscaDescriptorTemplate flavour : flavours) {
@@ -107,7 +112,10 @@ public final class VnfdLoader {
                 // IFA011 clause 7.1.2.2 keeps lifeCycleManagementScript at VNFD level, and SOL001
                 // clause 6.11.2 gives every flavour template the same VNF node type, so the scripts
                 // are read once with the header rather than once per flavour.
-                LcmMapper.map(vnf.get()).forEach(builder::addLifeCycleManagementScript);
+                for (LifeCycleManagementScript script : LcmMapper.map(vnf.get())) {
+                    SpecRules.lifecycleScriptHasEvent(script, flavour.file(), findings);
+                    builder.addLifeCycleManagementScript(script);
+                }
                 headerRead = true;
             }
 
@@ -119,6 +127,10 @@ public final class VnfdLoader {
             result.scripts.forEach(builder::addLcmOpParameterMappingScript);
             mciopIds.addAll(result.mciopIds);
             result.mciopArtifacts.forEach(a -> mciopArtifacts.putIfAbsent(a.getMciopId(), a));
+            result.securityGroupRules.forEach(r ->
+                    securityGroupRules.putIfAbsent(r.getSecurityGroupRuleId(), r));
+            result.packageChanges.forEach(c ->
+                    packageChanges.putIfAbsent(c.getChangeId(), c));
         }
 
         merged.vdus.values().forEach(builder::addVdu);
@@ -131,6 +143,8 @@ public final class VnfdLoader {
         merged.vipCpds.values().forEach(builder::addVipCpd);
         merged.virtualCpds.values().forEach(builder::addVirtualCpd);
         merged.certificates.values().forEach(builder::addCertificateDesc);
+        securityGroupRules.values().forEach(builder::addSecurityGroupRule);
+        packageChanges.values().forEach(builder::addVnfPackageChangeInfo);
         mciopIds.forEach(builder::addMciopId);
 
         if (!mciopArtifacts.isEmpty()) {

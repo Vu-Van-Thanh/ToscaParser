@@ -133,7 +133,7 @@ topology_template:
       properties:
         layer_protocols: [ ipv4 ]
         segmentation_type: vlan
-        segmentation_id: '101'
+        segmentation_id: 101
         is_automatic_discovery: false
       requirements:
         - virtual_binding: AppVdu

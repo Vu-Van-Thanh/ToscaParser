@@ -1,6 +1,7 @@
 package com.example.etsi.vnfd.services.template2vnfd;
 
 import com.example.etsi.vnfd.model.LcmRealizationPath;
+import com.example.etsi.vnfd.model.LifeCycleManagementScript;
 import com.example.etsi.vnfd.model.Vdu;
 import com.example.etsi.vnfd.model.VnfDf;
 import com.example.etsi.vnfd.model.Vnfd;
@@ -145,6 +146,29 @@ final class SpecRules {
                             source);
                 }
             }
+        }
+    }
+
+    /**
+     * IFA011 V5.4.1 clause 7.1.13.2 NOTE 1: "at least one of the attributes event or
+     * lcmTransitionEvent shall be included".
+     *
+     * <p>A script with neither is unreachable - nothing says when the VNFM should run it. SOL001
+     * clause 6.7.1.1 forms the preamble and postamble operations as {@code <base>_start} and
+     * {@code <base>_end}, and those are the ones that carry an internal lifecycle event; an
+     * implementation on a base operation such as {@code instantiate} maps to no event this library
+     * can name, which is exactly the case this rule catches.
+     *
+     * <p>Not fatal. The script is still produced, because a consumer that knows more about the
+     * operation than this library does can still use it.
+     */
+    static void lifecycleScriptHasEvent(LifeCycleManagementScript script, String sourceFile,
+            Findings findings) {
+        if (script.getEvent().isEmpty() && script.getLcmTransitionEvent().isEmpty()) {
+            findings.error("C24", "IFA011 V5.4.1 cl. 7.1.13.2 NOTE 1",
+                    "Lifecycle script " + script.getLcmScriptId() + " declares neither an event nor "
+                            + "an lcmTransitionEvent, so nothing states when it runs",
+                    sourceFile == null ? null : SourceRef.ofFile(sourceFile));
         }
     }
 

@@ -32,6 +32,7 @@ public final class Vdu {
     private final List<String> mcioConstraintParams;
     private final PropertyValue<Boolean> isNumOfInstancesClusterBased;
     private final List<String> certificateDesc;
+    private final List<TrunkPortTopology> trunkPort;
     private final LcmRealizationPath lcmRealizationPath;
 
     private Vdu(Builder builder) {
@@ -46,7 +47,9 @@ public final class Vdu {
         this.mcioConstraintParams =
                 Collections.unmodifiableList(new ArrayList<>(builder.mcioConstraintParams));
         this.isNumOfInstancesClusterBased = builder.isNumOfInstancesClusterBased;
-        this.certificateDesc = Collections.unmodifiableList(new ArrayList<>(builder.certificateDesc));
+        this.certificateDesc =
+                Collections.unmodifiableList(new ArrayList<>(builder.certificateDesc));
+        this.trunkPort = Collections.unmodifiableList(new ArrayList<>(builder.trunkPort));
         this.lcmRealizationPath = builder.lcmRealizationPath;
     }
 
@@ -127,6 +130,16 @@ public final class Vdu {
     }
 
     /**
+     * The trunk topologies this VDU takes part in. IFA011 cl. 7.1.6.2.2 {@code trunkPort}, 0..N.
+     *
+     * <p>Assembled from the connection points: SOL001 states the relation on the VduSubCp, through
+     * its {@code trunk_binding} requirement, rather than on the VDU.
+     */
+    public List<TrunkPortTopology> getTrunkPort() {
+        return trunkPort;
+    }
+
+    /**
      * How the infrastructure is expected to realise this VDU.
      *
      * <p>[MANO INTERPRETATION] Not an IFA011 attribute. Derived from whether an MciopProfile
@@ -153,6 +166,7 @@ public final class Vdu {
         private final List<String> mcioConstraintParams = new ArrayList<>();
         private PropertyValue<Boolean> isNumOfInstancesClusterBased;
         private final List<String> certificateDesc = new ArrayList<>();
+        private final List<TrunkPortTopology> trunkPort = new ArrayList<>();
         private LcmRealizationPath lcmRealizationPath;
 
         private Builder(String vduId) {
@@ -203,6 +217,11 @@ public final class Vdu {
 
         public Builder addCertificateDesc(String value) {
             certificateDesc.add(value);
+            return this;
+        }
+
+        public Builder addTrunkPort(TrunkPortTopology value) {
+            trunkPort.add(value);
             return this;
         }
 

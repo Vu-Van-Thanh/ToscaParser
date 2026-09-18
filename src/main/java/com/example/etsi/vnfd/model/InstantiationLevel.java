@@ -22,6 +22,7 @@ public final class InstantiationLevel {
     private final String description;
     private final List<VduLevel> vduLevel;
     private final List<ScaleInfo> scaleInfo;
+    private final List<VirtualLinkBitRateLevel> virtualLinkBitRateLevel;
     private final boolean synthesised;
 
     private InstantiationLevel(Builder builder) {
@@ -29,6 +30,8 @@ public final class InstantiationLevel {
         this.description = builder.description;
         this.vduLevel = Collections.unmodifiableList(new ArrayList<>(builder.vduLevel));
         this.scaleInfo = Collections.unmodifiableList(new ArrayList<>(builder.scaleInfo));
+        this.virtualLinkBitRateLevel =
+                Collections.unmodifiableList(new ArrayList<>(builder.virtualLinkBitRateLevel));
         this.synthesised = builder.synthesised;
     }
 
@@ -57,6 +60,15 @@ public final class InstantiationLevel {
     }
 
     /**
+     * Bitrate requirements for the virtual links at this level.
+     *
+     * <p>IFA011 V5.4.1 clause 7.1.8.7.2: {@code virtualLinkBitRateLevel}, M,0..N.
+     */
+    public List<VirtualLinkBitRateLevel> getVirtualLinkBitRateLevel() {
+        return virtualLinkBitRateLevel;
+    }
+
+    /**
      * Whether this level was created by the parser rather than declared in the descriptor.
      *
      * <p>[MANO INTERPRETATION] IFA011 clause 7.1.8.2.2 requires at least one instantiation level,
@@ -79,6 +91,7 @@ public final class InstantiationLevel {
         private String description;
         private final List<VduLevel> vduLevel = new ArrayList<>();
         private final List<ScaleInfo> scaleInfo = new ArrayList<>();
+        private final List<VirtualLinkBitRateLevel> virtualLinkBitRateLevel = new ArrayList<>();
         private boolean synthesised;
 
         private Builder(String levelId) {
@@ -92,6 +105,11 @@ public final class InstantiationLevel {
 
         public Builder addVduLevel(VduLevel value) {
             this.vduLevel.add(value);
+            return this;
+        }
+
+        public Builder addVirtualLinkBitRateLevel(VirtualLinkBitRateLevel value) {
+            virtualLinkBitRateLevel.add(value);
             return this;
         }
 

@@ -19,6 +19,7 @@ public final class ScalingAspect {
     private final String description;
     private final Integer maxScaleLevel;
     private final List<String> stepDeltas;
+    private final List<ScalingDelta> deltas;
 
     private ScalingAspect(Builder builder) {
         this.id = Objects.requireNonNull(builder.id, "id");
@@ -26,6 +27,7 @@ public final class ScalingAspect {
         this.description = builder.description;
         this.maxScaleLevel = builder.maxScaleLevel;
         this.stepDeltas = Collections.unmodifiableList(new ArrayList<>(builder.stepDeltas));
+        this.deltas = Collections.unmodifiableList(new ArrayList<>(builder.deltas));
     }
 
     public static Builder builder(String id) {
@@ -55,6 +57,18 @@ public final class ScalingAspect {
         return stepDeltas;
     }
 
+    /**
+     * The scaling deltas themselves. IFA011 V5.4.1 clause 7.1.10.4 {@code ScalingDelta}.
+     *
+     * <p>[PROJECT-SPECIFIC] IFA011 clause 7.1.10.3 wraps {@code deltas} and {@code stepDeltas}
+     * together in an {@code AspectDeltaDetails} element. Both are held directly on the aspect
+     * here: the wrapper carries nothing of its own, and a reader asking what one scaling step
+     * does should not have to step through a container to find out.
+     */
+    public List<ScalingDelta> getDeltas() {
+        return deltas;
+    }
+
     @Override
     public String toString() {
         return id + " (max " + maxScaleLevel + ")";
@@ -67,6 +81,7 @@ public final class ScalingAspect {
         private String description;
         private Integer maxScaleLevel;
         private final List<String> stepDeltas = new ArrayList<>();
+        private final List<ScalingDelta> deltas = new ArrayList<>();
 
         private Builder(String id) {
             this.id = id;
@@ -89,6 +104,11 @@ public final class ScalingAspect {
 
         public Builder addStepDelta(String value) {
             stepDeltas.add(value);
+            return this;
+        }
+
+        public Builder addDelta(ScalingDelta value) {
+            deltas.add(value);
             return this;
         }
 

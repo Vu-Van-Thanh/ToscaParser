@@ -36,6 +36,7 @@ public final class VnfDf {
     private final List<AffinityOrAntiAffinityGroup> affinityOrAntiAffinityGroup;
     private final List<ScalingAspect> scalingAspect;
     private final List<DeployableModule> deployableModule;
+    private final ScalingDelta initialDelta;
     private final VnfLcmOperationsConfiguration vnfLcmOperationsConfiguration;
     private final String sourceFile;
 
@@ -54,6 +55,7 @@ public final class VnfDf {
         this.scalingAspect = Collections.unmodifiableList(new ArrayList<>(builder.scalingAspect));
         this.deployableModule =
                 Collections.unmodifiableList(new ArrayList<>(builder.deployableModule));
+        this.initialDelta = builder.initialDelta;
         this.vnfLcmOperationsConfiguration = builder.vnfLcmOperationsConfiguration;
         this.sourceFile = builder.sourceFile;
     }
@@ -113,6 +115,16 @@ public final class VnfDf {
         return deployableModule;
     }
 
+    /**
+     * The minimum size of the VNF - scale level zero for every scaling aspect.
+     *
+     * <p>IFA011 V5.4.1 clause 7.1.8.2.2: {@code initialDelta}, a {@code ScalingDelta} that
+     * "shall be present if the aspectDeltaDetails attribute is present".
+     */
+    public Optional<ScalingDelta> getInitialDelta() {
+        return Optional.ofNullable(initialDelta);
+    }
+
     public Optional<VnfLcmOperationsConfiguration> getVnfLcmOperationsConfiguration() {
         return Optional.ofNullable(vnfLcmOperationsConfiguration);
     }
@@ -161,6 +173,7 @@ public final class VnfDf {
         private final List<AffinityOrAntiAffinityGroup> affinityOrAntiAffinityGroup = new ArrayList<>();
         private final List<ScalingAspect> scalingAspect = new ArrayList<>();
         private final List<DeployableModule> deployableModule = new ArrayList<>();
+        private ScalingDelta initialDelta;
         private VnfLcmOperationsConfiguration vnfLcmOperationsConfiguration;
         private String sourceFile;
 
@@ -205,6 +218,11 @@ public final class VnfDf {
 
         public Builder addScalingAspect(ScalingAspect value) {
             scalingAspect.add(value);
+            return this;
+        }
+
+        public Builder initialDelta(ScalingDelta value) {
+            this.initialDelta = value;
             return this;
         }
 

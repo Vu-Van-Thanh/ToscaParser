@@ -46,6 +46,8 @@ public final class Vnfd {
     private final List<VipCpd> vipCpd;
     private final List<VirtualCpd> virtualCpd;
     private final List<CertificateDesc> certificateDesc;
+    private final List<SecurityGroupRule> securityGroupRule;
+    private final List<VnfPackageChangeInfo> vnfPackageChangeInfo;
     private final List<VnfDf> df;
     private final List<String> mciopId;
     private final List<LcmOpParameterMappingScript> lcmOpParameterMappingScript;
@@ -74,6 +76,10 @@ public final class Vnfd {
         this.vipCpd = Collections.unmodifiableList(new ArrayList<>(b.vipCpd));
         this.virtualCpd = Collections.unmodifiableList(new ArrayList<>(b.virtualCpd));
         this.certificateDesc = Collections.unmodifiableList(new ArrayList<>(b.certificateDesc));
+        this.securityGroupRule =
+                Collections.unmodifiableList(new ArrayList<>(b.securityGroupRule));
+        this.vnfPackageChangeInfo =
+                Collections.unmodifiableList(new ArrayList<>(b.vnfPackageChangeInfo));
         this.df = Collections.unmodifiableList(new ArrayList<>(b.df));
         this.mciopId = Collections.unmodifiableList(new ArrayList<>(b.mciopId));
         this.lcmOpParameterMappingScript =
@@ -186,6 +192,20 @@ public final class Vnfd {
         return certificateDesc;
     }
 
+    /** Security group rules. IFA011 clause 7.1.2.2: {@code securityGroupRule}, M,0..N. */
+    public List<SecurityGroupRule> getSecurityGroupRule() {
+        return securityGroupRule;
+    }
+
+    /**
+     * Rules for changing a VNF instance to a different package.
+     *
+     * <p>IFA011 clause 7.1.2.2: {@code vnfPackageChangeInfo}, M,0..N.
+     */
+    public List<VnfPackageChangeInfo> getVnfPackageChangeInfo() {
+        return vnfPackageChangeInfo;
+    }
+
     /** Deployment flavours. IFA011 names this attribute deploymentFlavour. */
     public List<VnfDf> getDf() {
         return df;
@@ -247,6 +267,8 @@ public final class Vnfd {
         private final List<VipCpd> vipCpd = new ArrayList<>();
         private final List<VirtualCpd> virtualCpd = new ArrayList<>();
         private final List<CertificateDesc> certificateDesc = new ArrayList<>();
+        private final List<SecurityGroupRule> securityGroupRule = new ArrayList<>();
+        private final List<VnfPackageChangeInfo> vnfPackageChangeInfo = new ArrayList<>();
         private final List<VnfDf> df = new ArrayList<>();
         private final List<String> mciopId = new ArrayList<>();
         private final List<LcmOpParameterMappingScript> lcmOpParameterMappingScript = new ArrayList<>();
@@ -371,6 +393,16 @@ public final class Vnfd {
 
         public Builder addVirtualCpd(VirtualCpd value) {
             virtualCpd.add(value);
+            return this;
+        }
+
+        public Builder addSecurityGroupRule(SecurityGroupRule value) {
+            securityGroupRule.add(value);
+            return this;
+        }
+
+        public Builder addVnfPackageChangeInfo(VnfPackageChangeInfo value) {
+            vnfPackageChangeInfo.add(value);
             return this;
         }
 

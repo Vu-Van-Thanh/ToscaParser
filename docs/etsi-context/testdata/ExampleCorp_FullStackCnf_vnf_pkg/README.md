@@ -44,11 +44,17 @@ df[0].virtualLinkProfile 1 [SignallingVl]  max/min bitrate carried
 findings             none
 ```
 
-### The one gap left
+`AppSubCp` also produces a trunk topology on the VDU:
 
-**`AppSubCp` loses its sub-port detail.** It maps through the ordinary `VduCp` path, so
-`segmentation_type`, `segmentation_id` and `trunk_binding` are read into the bound node and then go
-no further. IFA011 keeps that information in `Vdu.trunkPort`, which this library does not model.
+```
+vdu[AppVdu].trunkPort  [{parentPortCpd: AppCp, subportList: [{subportCpd: AppSubCp,
+                          segmentationType: vlan, segmentationId: 101}]}]
+```
 
-Everything else this package used to document as missing is now mapped: storage, VipCp, VirtualCp,
-DeployableModule, Certificate and the virtual link profile.
+IFA011 clause 7.1.6.11 keeps that on the VDU while SOL001 states the relation on the subport, through
+the `trunk_binding` requirement of clause 6.8.11 — so the topology is assembled by reading every
+subport and grouping them by the parent they name.
+
+### No gaps left
+
+Every node type this package declares now reaches an information element.

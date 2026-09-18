@@ -40,11 +40,26 @@ is the proof that group expansion works.
 
 Expected findings: **none**.
 
-## Known gaps this package documents
+## Everything else it now covers
 
-`VduScalingAspectDeltas` and `VduInitialDelta` are declared here and parse into the type registry,
-but no mapper reads them. IFA011 models the deltas as part of the scaling aspect; nothing in this
-library carries them yet.
+```
+scalingAspect[api_scaling].deltas   [{scalingDeltaId: delta_1, vduDelta: [{ApiVdu, 2}]}]
+df[0].initialDelta                  {scalingDeltaId: initial_delta,
+                                     vduDelta: [{ApiVdu, 1}, {DbVdu, 1}]}
+instantiationLevel[small].virtualLinkBitRateLevel  [{DataVl, {root: 1000000}}]
+instantiationLevel[large].virtualLinkBitRateLevel  [{DataVl, {root: 8000000}}]
+securityGroupRule                   [{allow_api_ingress, ingress/ipv4/tcp 443-443,
+                                      targets [ApiCp]}]
+```
 
-`scale_info` and `step_deltas` used to be dropped as well - both are carried now, which is what
-`instantiationLevel[].scaleInfo` and `scalingAspect[].stepDeltas` in the output show.
+Two of these are worth a word because SOL001 and IFA011 disagree about shape, not content:
+
+- **Scaling deltas are turned inside out.** SOL001 clause 6.10.6 writes `deltas` as a map keyed by
+  `scalingDeltaId` with the policy targets naming the VDUs. IFA011 clause 7.1.10.4 has one
+  `ScalingDelta` carrying a `vduDelta` entry per VDU. Two policies naming the same delta id for
+  different VDUs are therefore **one** delta with two entries.
+- **The security group reference runs the other way.** SOL001 states it as policy targets; IFA011
+  keeps `securityGroupRuleId` on the `VduCpd` and `VnfExtCpd`. The targets are carried under
+  `_targets` so the application of a rule can be read without scanning every connection point.
+
+No gaps left here.

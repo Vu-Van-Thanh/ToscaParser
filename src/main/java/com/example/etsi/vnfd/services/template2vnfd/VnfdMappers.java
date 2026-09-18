@@ -12,6 +12,10 @@ import com.example.etsi.vnfd.model.MciopProfile;
 import com.example.etsi.vnfd.model.OsContainerDesc;
 import com.example.etsi.vnfd.model.ScaleInfo;
 import com.example.etsi.vnfd.model.ScalingAspect;
+import com.example.etsi.vnfd.model.ScalingDelta;
+import com.example.etsi.vnfd.model.SecurityGroupRule;
+import com.example.etsi.vnfd.model.Subport;
+import com.example.etsi.vnfd.model.TrunkPortTopology;
 import com.example.etsi.vnfd.model.SwImageDesc;
 import com.example.etsi.vnfd.model.Vdu;
 import com.example.etsi.vnfd.model.VduCpd;
@@ -20,8 +24,10 @@ import com.example.etsi.vnfd.model.VduProfile;
 import com.example.etsi.vnfd.model.VnfDf;
 import com.example.etsi.vnfd.model.VnfExtCpd;
 import com.example.etsi.vnfd.model.VnfLcmOperationsConfiguration;
+import com.example.etsi.vnfd.model.VnfPackageChangeInfo;
 import com.example.etsi.vnfd.model.VipCpd;
 import com.example.etsi.vnfd.model.VirtualCpd;
+import com.example.etsi.vnfd.model.VirtualLinkBitRateLevel;
 import com.example.etsi.vnfd.model.VirtualLinkProfile;
 import com.example.etsi.vnfd.model.VirtualStorageDesc;
 import com.example.etsi.vnfd.model.VnfVirtualLinkDesc;
@@ -47,6 +53,7 @@ import com.example.etsi.vnfd.toscatype.node.Certificate;
 import com.example.etsi.vnfd.toscatype.node.NfvNode;
 import com.example.etsi.vnfd.toscatype.node.VduCp;
 import com.example.etsi.vnfd.toscatype.node.VduOsContainer;
+import com.example.etsi.vnfd.toscatype.node.VduSubCp;
 import com.example.etsi.vnfd.toscatype.node.VduOsContainerDeployableUnit;
 import com.example.etsi.vnfd.toscatype.node.VduVirtualBlockStorage;
 import com.example.etsi.vnfd.toscatype.node.VduVirtualFileStorage;
@@ -59,6 +66,10 @@ import com.example.etsi.vnfd.toscatype.node.VnfVirtualLink;
 import com.example.etsi.vnfd.toscatype.policy.AffinityRule;
 import com.example.etsi.vnfd.toscatype.policy.InstantiationLevels;
 import com.example.etsi.vnfd.toscatype.policy.ScalingAspects;
+import com.example.etsi.vnfd.toscatype.policy.VduInitialDelta;
+import com.example.etsi.vnfd.toscatype.policy.VduScalingAspectDeltas;
+import com.example.etsi.vnfd.toscatype.policy.VirtualLinkInstantiationLevels;
+import com.example.etsi.vnfd.toscatype.policy.VnfPackageChange;
 import com.example.etsi.vnfd.toscatype.policy.VduInstantiationLevels;
 import com.example.etsi.vnfd.typedef.EtsiTypes;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -203,6 +214,8 @@ final class VduMapper {
         // Declared on the connection points, collected here: IFA011 clause 7.1.6.2.2 intCpd.
         context.cpsBoundTo(node.getKey()).forEach(builder::addIntCpd);
 
+        trunkPorts(node, context).forEach(builder::addTrunkPort);
+
         LcmRealizationPath path =
                 LcmRealizationResolver.resolve(node, context.mciopsAssociatedTo(node.getKey()));
         builder.lcmRealizationPath(path);
@@ -211,6 +224,45 @@ final class VduMapper {
         SpecRules.mcioIdentificationData(node, context.findings());
 
         return builder.build();
+    }
+
+    /**
+     * The trunk topologies of one VDU, IFA011 V5.4.1 clause 7.1.6.11.
+     *
+     * <p>SOL001 states the relation on the subport rather than on the VDU or the parent: a
+     * {@code VduSubCp} (clause 6.8.11) carries a {@code trunk_binding} requirement whose occurrences
+     * are [1, 1] and which names the {@code VduCp} acting as the trunk port. So the topology is
+     * assembled by reading every subport of the VDU and grouping them by the parent they name.
+     *
+     * <p>A subport bound to a parent that belongs to a different VDU is skipped rather than
+     * reported: nothing in clause 6.8.11 forbids it, and this mapper is not the place to decide it
+     * is wrong.
+     */
+    private static List<TrunkPortTopology> trunkPorts(VduOsContainerDeployableUnit vdu,
+            FlavourContext context) {
+        Map<String, List<Subport>> byParent = new LinkedHashMap<>();
+        for (String cpKey : context.cpsBoundTo(vdu.getKey())) {
+            Cp cp = context.connectionPoints().get(cpKey);
+            if (!(cp instanceof VduSubCp)) {
+                continue;
+            }
+            VduSubCp sub = (VduSubCp) cp;
+            String parent = sub.getRequirements() == null
+                    ? null
+                    : FlavourContext.first(sub.getRequirements().getTrunkBinding()).orElse(null);
+            if (parent == null) {
+                continue;
+            }
+            VduSubCp.Properties p = sub.getProperties();
+            byParent.computeIfAbsent(parent, k -> new ArrayList<>())
+                    .add(Subport.of(IdRegistry.cpdId(sub),
+                            p == null ? null : p.getSegmentationType(),
+                            p == null ? null : p.getSegmentationId()));
+        }
+
+        List<TrunkPortTopology> out = new ArrayList<>();
+        byParent.forEach((parent, subports) -> out.add(TrunkPortTopology.of(parent, subports)));
+        return out;
     }
 }
 
@@ -657,6 +709,8 @@ final class PolicyMapper {
             });
         }
 
+        applyVirtualLinkLevels(context, builders);
+
         List<InstantiationLevel> levels = new ArrayList<>();
         builders.values().forEach(b -> levels.add(b.build()));
         return levels;
@@ -694,6 +748,179 @@ final class PolicyMapper {
     }
 
     /** The scaling aspects, SOL001 clause 6.10.5. */
+    /**
+     * SOL001 V5.4.1 clause 6.10.6 {@code VduScalingAspectDeltas} to the {@code ScalingDelta}
+     * elements of IFA011 V5.4.1 clause 7.1.10.4, keyed by the aspect they belong to.
+     *
+     * <p>SOL001 writes {@code deltas} as a map whose key is the scalingDeltaId and whose value gives
+     * the instance count, with the policy targets naming the VDUs. IFA011 turns that inside out:
+     * one ScalingDelta carries a {@code vduDelta} entry per VDU. So two policies naming the same
+     * delta id for different VDUs are one delta with two entries, which is why this accumulates
+     * rather than builds each policy independently.
+     */
+    Map<String, List<ScalingDelta>> scalingDeltas(FlavourContext context) {
+        Map<String, Map<String, ScalingDelta.Builder>> byAspect = new LinkedHashMap<>();
+
+        for (PolicyDefinition definition : of(context, EtsiTypes.POLICY_VDU_SCALING_ASPECT_DELTAS)) {
+            VduScalingAspectDeltas policy = bind(definition, VduScalingAspectDeltas.class);
+            if (policy.getProperties() == null || policy.getProperties().getAspect() == null
+                    || policy.getProperties().getDeltas() == null) {
+                continue;
+            }
+            String aspectId = policy.getProperties().getAspect().resolved().orElse(null);
+            if (aspectId == null) {
+                continue;
+            }
+            Map<String, ScalingDelta.Builder> deltas =
+                    byAspect.computeIfAbsent(aspectId, k -> new LinkedHashMap<>());
+            policy.getProperties().getDeltas().forEach((deltaId, level) -> {
+                if (level == null || level.getNumberOfInstances() == null) {
+                    return;
+                }
+                Integer count = level.getNumberOfInstances().resolved().orElse(null);
+                if (count == null) {
+                    return;
+                }
+                ScalingDelta.Builder b =
+                        deltas.computeIfAbsent(deltaId, ScalingDelta::builder);
+                for (String vduId : FlavourContext.orEmpty(definition.targets())) {
+                    b.addVduDelta(VduLevel.of(vduId, count));
+                }
+            });
+        }
+
+        Map<String, List<ScalingDelta>> out = new LinkedHashMap<>();
+        byAspect.forEach((aspectId, deltas) -> {
+            List<ScalingDelta> built = new ArrayList<>();
+            deltas.values().forEach(b -> built.add(b.build()));
+            out.put(aspectId, built);
+        });
+        return out;
+    }
+
+    /**
+     * SOL001 V5.4.1 clause 6.10.8 {@code VduInitialDelta} to IFA011 {@code VnfDf.initialDelta}.
+     *
+     * <p>IFA011 clause 7.1.8.2.2 describes it as "the minimum size of the VNF (i.e. scale level zero
+     * for all scaling aspects)", so the per-VDU policies of one flavour make up a single delta
+     * rather than one each.
+     *
+     * <p>[ASSUMPTION] Its {@code scalingDeltaId}. IFA011 makes the identifier mandatory and SOL001
+     * gives the policy no name for it, so a fixed one is used.
+     */
+    Optional<ScalingDelta> initialDelta(FlavourContext context) {
+        ScalingDelta.Builder builder = ScalingDelta.builder("initial_delta");
+        boolean any = false;
+        for (PolicyDefinition definition : of(context, EtsiTypes.POLICY_VDU_INITIAL_DELTA)) {
+            VduInitialDelta policy = bind(definition, VduInitialDelta.class);
+            if (policy.getProperties() == null || policy.getProperties().getInitialDelta() == null) {
+                continue;
+            }
+            com.example.etsi.vnfd.toscatype.data.VduLevel level =
+                    policy.getProperties().getInitialDelta();
+            if (level.getNumberOfInstances() == null) {
+                continue;
+            }
+            Integer count = level.getNumberOfInstances().resolved().orElse(null);
+            if (count == null) {
+                continue;
+            }
+            for (String vduId : FlavourContext.orEmpty(definition.targets())) {
+                builder.addVduDelta(VduLevel.of(vduId, count));
+                any = true;
+            }
+        }
+        return any ? Optional.of(builder.build()) : Optional.empty();
+    }
+
+    /**
+     * SOL001 V5.4.1 clause 6.10.3 {@code VirtualLinkInstantiationLevels} to
+     * {@code InstantiationLevel.virtualLinkBitRateLevel}, IFA011 clause 7.1.10.5.
+     *
+     * <p>Folded into the levels an {@code InstantiationLevels} policy already declared, for the same
+     * reason as the VDU levels: a level id nothing declared is a reference to a level that does not
+     * exist.
+     */
+    void applyVirtualLinkLevels(FlavourContext context,
+            Map<String, InstantiationLevel.Builder> builders) {
+        for (PolicyDefinition definition : of(context, EtsiTypes.POLICY_VL_INSTANTIATION_LEVELS)) {
+            VirtualLinkInstantiationLevels policy =
+                    bind(definition, VirtualLinkInstantiationLevels.class);
+            if (policy.getProperties() == null || policy.getProperties().getLevels() == null) {
+                continue;
+            }
+            policy.getProperties().getLevels().forEach((levelId, level) -> {
+                InstantiationLevel.Builder b = builders.get(levelId);
+                if (b == null || level == null) {
+                    return;
+                }
+                // The SOL001 level wraps the requirements in a bitrate_requirements field; IFA011
+                // clause 7.1.10.5.2 has VirtualLinkBitRateLevel carry them directly, so unwrap.
+                Map<String, Object> bitrate = VnfdMappers.plainMap(level.getBitrateRequirements());
+                for (String vlId : FlavourContext.orEmpty(definition.targets())) {
+                    b.addVirtualLinkBitRateLevel(VirtualLinkBitRateLevel.of(vlId, bitrate));
+                }
+            });
+        }
+    }
+
+    /**
+     * SOL001 V5.4.1 clause 6.10.13 {@code SecurityGroupRule} to IFA011 clause 7.1.6.9.
+     *
+     * <p>[ASSUMPTION] {@code securityGroupRuleId} is the policy name. IFA011 makes the identifier
+     * mandatory and NOTE 3 of Table 7.1.6.9.2-1 relies on it - "Different VduCpd or VnfExtCpd with
+     * the same value of securityGroupRuleId imply they belong to the same security group" - but
+     * SOL001 states no derivation.
+     */
+    List<SecurityGroupRule> securityGroupRules(FlavourContext context) {
+        List<SecurityGroupRule> out = new ArrayList<>();
+        for (PolicyDefinition definition : of(context, EtsiTypes.POLICY_SECURITY_GROUP_RULE)) {
+            com.example.etsi.vnfd.toscatype.policy.SecurityGroupRule policy =
+                    bind(definition, com.example.etsi.vnfd.toscatype.policy.SecurityGroupRule.class);
+            SecurityGroupRule.Builder builder = SecurityGroupRule.builder(definition.name());
+            if (policy.getProperties() != null) {
+                com.example.etsi.vnfd.toscatype.policy.SecurityGroupRule.Properties p =
+                        policy.getProperties();
+                builder.description(p.getDescription())
+                       .direction(p.getDirection())
+                       .etherType(p.getEtherType())
+                       .protocol(p.getProtocol())
+                       .portRangeMin(p.getPortRangeMin())
+                       .portRangeMax(p.getPortRangeMax());
+            }
+            FlavourContext.orEmpty(definition.targets()).forEach(builder::addTarget);
+            out.add(builder.build());
+        }
+        return out;
+    }
+
+    /**
+     * SOL001 V5.4.1 clause 6.10.15 {@code VnfPackageChange} to IFA011 clause 7.1.15.2
+     * {@code VnfPackageChangeInfo}.
+     */
+    List<VnfPackageChangeInfo> packageChanges(FlavourContext context) {
+        List<VnfPackageChangeInfo> out = new ArrayList<>();
+        for (PolicyDefinition definition : of(context, EtsiTypes.POLICY_VNF_PACKAGE_CHANGE)) {
+            VnfPackageChange policy = bind(definition, VnfPackageChange.class);
+            VnfPackageChangeInfo.Builder builder = VnfPackageChangeInfo.builder(definition.name());
+            if (policy.getProperties() != null) {
+                VnfPackageChange.Properties p = policy.getProperties();
+                builder.modificationQualifier(p.getModificationQualifier())
+                       .additionalModificationDescription(p.getAdditionalModificationDescription())
+                       .destinationFlavourId(p.getDestinationFlavourId());
+                if (p.getSelector() != null) {
+                    p.getSelector().forEach(sel -> builder.addSelector(VnfdMappers.plainMap(sel)));
+                }
+                if (p.getComponentMappings() != null) {
+                    p.getComponentMappings()
+                            .forEach(cm -> builder.addComponentMapping(VnfdMappers.plainMap(cm)));
+                }
+            }
+            out.add(builder.build());
+        }
+        return out;
+    }
+
     List<ScalingAspect> scalingAspects(FlavourContext context) {
         List<ScalingAspect> out = new ArrayList<>();
         for (PolicyDefinition definition : of(context, EtsiTypes.POLICY_SCALING_ASPECTS)) {
@@ -701,8 +928,10 @@ final class PolicyMapper {
             if (policy.getProperties() == null || policy.getProperties().getAspects() == null) {
                 continue;
             }
+            Map<String, List<ScalingDelta>> deltasByAspect = scalingDeltas(context);
             policy.getProperties().getAspects().forEach((id, aspect) -> {
                 ScalingAspect.Builder b = ScalingAspect.builder(id);
+                deltasByAspect.getOrDefault(id, Collections.emptyList()).forEach(b::addDelta);
                 if (aspect != null) {
                     resolved(aspect.getName()).ifPresent(b::name);
                     resolved(aspect.getDescription()).ifPresent(b::description);
@@ -840,6 +1069,8 @@ final class DeploymentFlavourMapper {
     /** A mapped flavour plus the elements IFA011 keeps at VNFD level. */
     static final class Result {
         final VnfDf df;
+        final List<SecurityGroupRule> securityGroupRules = new ArrayList<>();
+        final List<VnfPackageChangeInfo> packageChanges = new ArrayList<>();
         final List<LcmOpParameterMappingScript> scripts = new ArrayList<>();
         final List<MciopArtifacts> mciopArtifacts = new ArrayList<>();
         final List<String> mciopIds = new ArrayList<>();
@@ -881,6 +1112,7 @@ final class DeploymentFlavourMapper {
         }
 
         policies.scalingAspects(context).forEach(builder::addScalingAspect);
+        policies.initialDelta(context).ifPresent(builder::initialDelta);
 
         // IFA011 Table 7.1.8.2.2-1 puts deployableModule on the flavour, not on the VNFD: the set
         // of optional VDUs is what a consumer selects when instantiating this flavour.
@@ -904,6 +1136,10 @@ final class DeploymentFlavourMapper {
 
         Result result = new Result(builder.build());
         SpecRules.flavourIdentified(result.df, context.template().file(), context.findings());
+        // IFA011 Table 7.1.2.2-1 keeps both of these at VNFD level, although SOL001 declares them as
+        // policies inside a service template - one template being one flavour.
+        result.securityGroupRules.addAll(policies.securityGroupRules(context));
+        result.packageChanges.addAll(policies.packageChanges(context));
         for (Mciop mciop : context.mciops()) {
             result.mciopIds.add(IdRegistry.mciopId(mciop));
             mciops.mapScript(mciop).ifPresent(result.scripts::add);

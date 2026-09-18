@@ -1,0 +1,106 @@
+# Violates: IFA011 V5.4.1 clause 7.1.13.2 NOTE 1 - "at least one of the attributes event or
+# lcmTransitionEvent shall be included".
+#
+# The VNF implements the BASE operation `instantiate` rather than `instantiate_start` or
+# `instantiate_end`. SOL001 V5.4.1 clause 6.7.1.1 forms the preamble and postamble operations as
+# <base>_start and <base>_end, and those are the ones carrying an internal VNFM lifecycle event.
+# IFA011 describes the base cases separately, as an "external stimulus detected on a VNFM reference
+# point", and names no EVENT_ value for them - so this script ends up with no event at all and
+# nothing states when the VNFM should run it.
+#
+# The script is still produced: a consumer that knows more about the operation than this library
+# does can still use it. Only the gap is reported.
+#
+# Expected: exactly one ERROR, C24.
+
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: A lifecycle script no event points at.
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+node_types:
+  ExampleCorp.NegC24.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        default: 10000000-0000-4000-8000-000000000024
+      provider:
+        type: string
+        default: ExampleCorp
+      product_name:
+        type: string
+        default: NegC24
+      software_version:
+        type: string
+        default: '1.0'
+      descriptor_version:
+        type: string
+        default: '1.0'
+      flavour_id:
+        type: string
+        default: default
+      flavour_description:
+        type: string
+        default: "A lifecycle script no event points at"
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+        default: [ '0:ExampleCorp-1.0.0' ]
+    interfaces:
+      Vnflcm:
+        type: tosca.interfaces.nfv.Vnflcm
+
+topology_template:
+
+  node_templates:
+
+    VNF:
+      type: ExampleCorp.NegC24.1_0
+      interfaces:
+        Vnflcm:
+          type: tosca.interfaces.nfv.Vnflcm
+          operations:
+            instantiate:
+              implementation:
+                primary: ../Artifacts/Scripts/do_instantiate.sh
+
+    AppVdu:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: app-vdu
+        description: "Application tier"
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 3
+        mcio_identification_data:
+          name: neg-app
+          type: Deployment
+      requirements:
+        - container: AppContainer
+
+    AppContainer:
+      type: tosca.nodes.nfv.Vdu.OsContainer
+      properties:
+        name: app
+        description: "Application container"
+        requested_cpu_resources: 200
+        requested_memory_resources: 256 MiB
+      artifacts:
+        sw_image:
+          type: tosca.artifacts.nfv.SwImage
+          file: ../Artifacts/README.txt
+          properties:
+            name: neg-app
+            version: '1.0'
+            container_format: docker
+
+    AppCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+      requirements:
+        - virtual_binding: AppVdu

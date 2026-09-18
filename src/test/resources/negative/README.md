@@ -21,6 +21,7 @@ and what the parse is expected to produce.
 | `neg_C8_mciop_no_vdu` | C8 | SOL001 6.8.14.6 — `associatedVdu` occurrences are `[1, UNBOUNDED]` |
 | `neg_C12_levels_no_default` | C12 | IFA011 7.1.8.2.2 — two instantiation levels, no default named |
 | `neg_C19_no_mcio_id_data` | C19 **and** TOSCA02 | IFA011 7.1.6.2.2 — see the note below |
+| `neg_C24_script_without_event` | C24 | IFA011 7.1.13.2 NOTE 1 — a lifecycle script with neither `event` nor `lcmTransitionEvent` |
 | `neg_TOSCA02_missing_required` | TOSCA02 | TOSCA 1.3 cl. 3.6.2 — a `required: true` property unassigned |
 | `neg_zipslip_artifact` | *(throws)* | `[PROJECT-SPECIFIC]` — an artifact path climbing out of the package |
 
