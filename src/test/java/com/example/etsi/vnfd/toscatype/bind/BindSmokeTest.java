@@ -3,7 +3,7 @@ package com.example.etsi.vnfd.toscatype.bind;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.etsi.vnfd.fixture.Fixtures;
-import com.example.etsi.vnfd.csar.CsarReader;
+import com.example.etsi.vnfd.csar.DirectoryCsarReader;
 import com.example.etsi.vnfd.template.converter.YamlService;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
 import com.example.etsi.vnfd.toscatype.node.Mciop;
@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 class BindSmokeTest {
 
     private Map<String, NfvNode> bind(String pkg) {
-        ServiceToscaTemplate tst = new YamlService().parse(CsarReader.of(Fixtures.packageDir(pkg)));
+        ServiceToscaTemplate tst = new YamlService().parse(new DirectoryCsarReader(Fixtures.packageDir(pkg)));
         NodeBinder binder = new NodeBinder(new TypeHierarchy(tst.typeRegistry()), NodeTypes.ALL);
         Map<String, NfvNode> out = new LinkedHashMap<>();
         for (Map.Entry<String, NodeTemplate> e :

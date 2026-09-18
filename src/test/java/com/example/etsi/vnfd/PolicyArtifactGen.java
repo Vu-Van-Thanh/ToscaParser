@@ -1,7 +1,7 @@
 package com.example.etsi.vnfd;
 
 import com.example.etsi.vnfd.fixture.Fixtures;
-import com.example.etsi.vnfd.csar.CsarReader;
+import com.example.etsi.vnfd.csar.DirectoryCsarReader;
 import com.example.etsi.vnfd.template.converter.YamlService;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
 import com.example.etsi.vnfd.typedef.PropertyDef;
@@ -45,7 +45,7 @@ class PolicyArtifactGen {
     @Test
     void generate() throws IOException {
         ServiceToscaTemplate tst = new YamlService()
-                .parse(CsarReader.of(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF)));
+                .parse(new DirectoryCsarReader(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF)));
         TypeHierarchy h = new TypeHierarchy(tst.typeRegistry());
 
         Path pol = Paths.get("target/policygen");

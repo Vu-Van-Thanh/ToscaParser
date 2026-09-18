@@ -1,7 +1,7 @@
 package com.example.etsi.vnfd.template;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import com.example.etsi.vnfd.csar.CsarReader;
+import com.example.etsi.vnfd.csar.DirectoryCsarReader;
 import com.example.etsi.vnfd.template.converter.YamlService;
 import com.example.etsi.vnfd.fixture.Fixtures;
 import com.example.etsi.vnfd.typedef.EtsiTypes;
@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 class YamlServiceTest {
 
     private static ServiceToscaTemplate parse(String packageName) {
-        return new YamlService().parse(CsarReader.of(Fixtures.packageDir(packageName)), new Findings());
+        return new YamlService().parse(new DirectoryCsarReader(Fixtures.packageDir(packageName)), new Findings());
     }
 
     private static TopologyTemplate topologyOf(ServiceToscaTemplate tst) {
@@ -74,10 +74,11 @@ class YamlServiceTest {
         for (String pkg : new String[]{Fixtures.SIMPLE_WEB_CNF, Fixtures.REGULAR_CNF,
                 Fixtures.HYBRID_WEB_CNF}) {
             ServiceToscaTemplate tst = parse(pkg);
+            java.nio.file.Path root = Fixtures.packageDir(pkg);
             for (NodeTemplate node : topologyOf(tst).nodeTemplates().values()) {
                 for (ArtifactDefinition artifact : node.artifacts().values()) {
                     String resolved = artifact.resolvedFile().orElseThrow(AssertionError::new);
-                    assertThat(tst.csar().exists(resolved))
+                    assertThat(java.nio.file.Files.exists(root.resolve(resolved)))
                             .as("%s: artifact %s.%s resolves to %s", pkg, node.name(),
                                     artifact.name(), resolved)
                             .isTrue();

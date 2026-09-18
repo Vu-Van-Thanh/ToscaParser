@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class ToscaMetaTest {
 
     private static ToscaMeta parse(String packageName, Findings findings) {
-        CsarReader csar = CsarReader.of(Fixtures.packageDir(packageName));
+        DirectoryCsarReader csar = new DirectoryCsarReader(Fixtures.packageDir(packageName));
         return ToscaMeta.parse(csar, findings);
     }
 
@@ -64,25 +64,25 @@ class ToscaMetaTest {
     void everyBundledPackageHasReachableEntryDefinitions() {
         for (String pkg : new String[]{Fixtures.SIMPLE_WEB_CNF, Fixtures.REGULAR_CNF,
                 Fixtures.HYBRID_WEB_CNF}) {
-            CsarReader csar = CsarReader.of(Fixtures.packageDir(pkg));
+            DirectoryCsarReader csar = new DirectoryCsarReader(Fixtures.packageDir(pkg));
             ToscaMeta meta = ToscaMeta.parse(csar, new Findings());
 
-            assertThat(csar.exists(meta.entryDefinitions()))
+            assertThat(csar.read(meta.entryDefinitions()))
                     .as("%s declares Entry-Definitions %s which must exist in the package",
                             pkg, meta.entryDefinitions())
-                    .isTrue();
+                    .isPresent();
         }
     }
 
     @Test
     @DisplayName("Other-Definitions may name a file the package does not ship")
     void otherDefinitionsMayBeAbsentFromPackage() {
-        CsarReader csar = CsarReader.of(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF));
+        DirectoryCsarReader csar = new DirectoryCsarReader(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF));
         ToscaMeta meta = ToscaMeta.parse(csar, new Findings());
 
         // SOL001 V5.4.1 Annex B.2 NOTE 2: the type definitions file "may, but need not, be
         // included in the VNF Package". All three bundled packages reference it without shipping it.
         assertThat(meta.otherDefinitions()).isNotEmpty();
-        assertThat(csar.exists(meta.otherDefinitions().get(0))).isFalse();
+        assertThat(csar.read(meta.otherDefinitions().get(0))).isEmpty();
     }
 }

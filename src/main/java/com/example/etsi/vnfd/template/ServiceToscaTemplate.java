@@ -1,6 +1,5 @@
 package com.example.etsi.vnfd.template;
 
-import com.example.etsi.vnfd.csar.CsarReader;
 import com.example.etsi.vnfd.csar.ToscaMeta;
 import com.example.etsi.vnfd.typedef.TypeRegistry;
 import java.util.ArrayList;
@@ -19,23 +18,23 @@ import java.util.stream.Collectors;
  */
 public final class ServiceToscaTemplate {
 
-    private final CsarReader csar;
+    private final String packageName;
     private final ToscaMeta meta;
     private final List<ToscaDescriptorTemplate> descriptorTemplates;
     private final TypeRegistry typeRegistry;
 
-    public ServiceToscaTemplate(CsarReader csar, ToscaMeta meta,
+    public ServiceToscaTemplate(String packageName, ToscaMeta meta,
                                 List<ToscaDescriptorTemplate> descriptorTemplates,
                                 TypeRegistry typeRegistry) {
-        this.csar = csar;
+        this.packageName = packageName;
         this.meta = meta;
         this.descriptorTemplates = Collections.unmodifiableList(new ArrayList<>(descriptorTemplates));
         this.typeRegistry = typeRegistry;
     }
 
-    /** The package these templates came from; artifacts are resolved against it. */
-    public CsarReader csar() {
-        return csar;
+    /** Name of the package these templates came from; artifact paths are relative to its root. */
+    public String packageName() {
+        return packageName;
     }
 
     public ToscaMeta meta() {
@@ -87,7 +86,7 @@ public final class ServiceToscaTemplate {
 
     @Override
     public String toString() {
-        return "ServiceToscaTemplate(" + csar.name() + ", "
+        return "ServiceToscaTemplate(" + packageName + ", "
                 + descriptorTemplates.size() + " template(s))";
     }
 }

@@ -1,6 +1,7 @@
 package com.example.etsi.vnfd.csar;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,11 +15,19 @@ import java.util.stream.Stream;
 /**
  * A VNF package laid out as a directory tree, i.e. an already-extracted CSAR.
  *
+ * <p>Paths are package-internal and canonical, as produced by {@link PathResolver#normalize}:
+ * forward slashes, no leading slash, e.g. {@code Definitions/main.yaml}.
+ *
+ * <p>SOL004 V5.1.1 clause 4.1.1 also allows a zip archive and a root-YAML layout without
+ * {@code TOSCA-Metadata}. Neither is supported: an archive is expected to be extracted before it
+ * gets here, and {@link ToscaMeta#parse} refuses a package with no {@code TOSCA.meta}.
+ * [VERSION MISMATCH] SOL004 has no V5.4.1 release; V5.1.1 is the latest.
+ *
  * <p>The directory is walked once at construction and the result is fixed: a package is onboarded
  * material, not a working directory, so re-reading it per lookup would only buy the ability to
  * observe someone editing it mid-parse.
  */
-public final class DirectoryCsarReader implements CsarReader {
+public final class DirectoryCsarReader {
 
     private final Path root;
     private final String name;
@@ -45,22 +54,12 @@ public final class DirectoryCsarReader implements CsarReader {
         }
     }
 
-    @Override
+    /** Human-readable identifier used in diagnostics and findings. */
     public String name() {
         return name;
     }
 
-    @Override
-    public Set<String> entries() {
-        return entries;
-    }
-
-    @Override
-    public boolean exists(String path) {
-        return entries.contains(PathResolver.normalize(path));
-    }
-
-    @Override
+    /** File contents, or empty when the path does not exist. */
     public Optional<byte[]> read(String path) {
         String canonical = PathResolver.normalize(path);
         if (!entries.contains(canonical)) {
@@ -77,6 +76,11 @@ public final class DirectoryCsarReader implements CsarReader {
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read package entry: " + canonical, e);
         }
+    }
+
+    /** Convenience for text files; VNF package descriptors and metadata are UTF-8. */
+    public Optional<String> readText(String path) {
+        return read(path).map(bytes -> new String(bytes, StandardCharsets.UTF_8));
     }
 
     @Override

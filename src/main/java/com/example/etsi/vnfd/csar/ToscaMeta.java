@@ -114,7 +114,7 @@ public final class ToscaMeta {
      * @throws IllegalStateException if the file is missing or declares no {@code Entry-Definitions};
      *     both make the package unparseable, as opposed to merely non-conformant
      */
-    public static ToscaMeta parse(CsarReader csar, Findings findings) {
+    public static ToscaMeta parse(DirectoryCsarReader csar, Findings findings) {
         SourceRef ref = SourceRef.ofFile(TOSCA_META_PATH);
         String text = csar.readText(TOSCA_META_PATH)
                 .orElseThrow(() -> new IllegalStateException(

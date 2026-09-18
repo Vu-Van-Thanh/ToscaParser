@@ -2,7 +2,7 @@ package com.example.etsi.vnfd.map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.etsi.vnfd.csar.CsarReader;
+import com.example.etsi.vnfd.csar.DirectoryCsarReader;
 import com.example.etsi.vnfd.fixture.Fixtures;
 import com.example.etsi.vnfd.model.LcmRealizationPath;
 import com.example.etsi.vnfd.model.MciopProfile;
@@ -18,7 +18,7 @@ class VnfdLoaderTest {
 
     private Vnfd parse(String pkg) {
         return new VnfdLoader()
-                .load(new YamlService().parse(CsarReader.of(Fixtures.packageDir(pkg))))
+                .load(new YamlService().parse(new DirectoryCsarReader(Fixtures.packageDir(pkg))))
                 .getVnfd();
     }
 

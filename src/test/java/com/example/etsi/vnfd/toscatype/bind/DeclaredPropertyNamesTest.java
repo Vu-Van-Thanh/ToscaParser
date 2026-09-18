@@ -3,7 +3,7 @@ package com.example.etsi.vnfd.toscatype.bind;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.etsi.vnfd.fixture.Fixtures;
-import com.example.etsi.vnfd.csar.CsarReader;
+import com.example.etsi.vnfd.csar.DirectoryCsarReader;
 import com.example.etsi.vnfd.template.converter.YamlService;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
 import com.example.etsi.vnfd.toscatype.node.EtsiNodeType;
@@ -37,7 +37,7 @@ class DeclaredPropertyNamesTest {
     @DisplayName("every bound property name is declared by the ETSI type")
     void everyBoundPropertyNameIsDeclared() {
         ServiceToscaTemplate tst = new YamlService()
-                .parse(CsarReader.of(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF)));
+                .parse(new DirectoryCsarReader(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF)));
         TypeHierarchy hierarchy = new TypeHierarchy(tst.typeRegistry());
 
         List<String> unknown = new ArrayList<>();

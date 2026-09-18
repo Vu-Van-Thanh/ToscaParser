@@ -2,7 +2,7 @@ package com.example.etsi.vnfd.map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.etsi.vnfd.csar.CsarReader;
+import com.example.etsi.vnfd.csar.DirectoryCsarReader;
 import com.example.etsi.vnfd.fixture.Fixtures;
 import com.example.etsi.vnfd.model.LcmRealizationPath;
 import com.example.etsi.vnfd.model.Vdu;
@@ -29,7 +29,7 @@ class FindingsTest {
     private ParseResult parse(Path packageDir) {
         Findings findings = new Findings();
         return new VnfdLoader()
-                .load(new YamlService().parse(CsarReader.of(packageDir), findings), findings);
+                .load(new YamlService().parse(new DirectoryCsarReader(packageDir), findings), findings);
     }
 
     private ParseResult parseFixture(String name) {

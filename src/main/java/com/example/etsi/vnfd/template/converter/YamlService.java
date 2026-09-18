@@ -1,6 +1,6 @@
 package com.example.etsi.vnfd.template.converter;
 
-import com.example.etsi.vnfd.csar.CsarReader;
+import com.example.etsi.vnfd.csar.DirectoryCsarReader;
 import com.example.etsi.vnfd.csar.PathResolver;
 import com.example.etsi.vnfd.csar.ToscaMeta;
 import com.example.etsi.vnfd.utils.ToscaYamlLoader;
@@ -41,11 +41,11 @@ public final class YamlService {
      * about the package rather than the descriptor - a missing manifest, a malformed TOSCA.meta key
      * - and this overload discards them. Genuine structural failures still throw.
      */
-    public ServiceToscaTemplate parse(CsarReader csar) {
+    public ServiceToscaTemplate parse(DirectoryCsarReader csar) {
         return parse(csar, new Findings());
     }
 
-    public ServiceToscaTemplate parse(CsarReader csar, Findings findings) {
+    public ServiceToscaTemplate parse(DirectoryCsarReader csar, Findings findings) {
         ToscaMeta meta = ToscaMeta.parse(csar, findings);
 
         List<String> candidateFiles = new ArrayList<>();
@@ -73,7 +73,7 @@ public final class YamlService {
         }
         markTopLevel(meta, withTopology, findings);
 
-        return new ServiceToscaTemplate(csar, meta, new ArrayList<>(templates.values()), types.build());
+        return new ServiceToscaTemplate(csar.name(), meta, new ArrayList<>(templates.values()), types.build());
     }
 
     /**
@@ -83,7 +83,7 @@ public final class YamlService {
      * definitions file "may, but need not, be included in the VNF Package", and packages routinely
      * reference it without shipping it; the bundled catalogue supplies those types instead.
      */
-    private void readFileAndImports(CsarReader csar, String file, TypeRegistryBuilder types,
+    private void readFileAndImports(DirectoryCsarReader csar, String file, TypeRegistryBuilder types,
                                     Map<String, ToscaDescriptorTemplate> templates,
                                     Set<String> visited, Findings findings, int depth) {
         if (depth > MAX_IMPORT_DEPTH || !visited.add(file)) {
