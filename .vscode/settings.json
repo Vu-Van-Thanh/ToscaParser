@@ -1,0 +1,21 @@
+{
+  // Both Maven projects are imported, so a breakpoint in the demo can be stepped through into the
+  // library source rather than into decompiled bytecode.
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.import.maven.enabled": true,
+  "java.project.importOnFirstTimeStartup": "automatic",
+
+  // Line length matches what the sources already use.
+  "editor.rulers": [100],
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  "files.exclude": {
+    "**/target": true
+  },
+  "search.exclude": {
+    "**/target": true,
+    "docs/etsi-pdf-document": true
+  }
+}
