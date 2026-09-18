@@ -122,7 +122,7 @@ class EtsiTypeCatalogueTest {
 
         PropertyDef entry = vnfmInfo.entrySchema().orElseThrow(AssertionError::new);
         assertThat(entry.constraints()).isNotEmpty();
-        assertThat(entry.constraints().get(0).validate("GenericVnfm")).isPresent();
-        assertThat(entry.constraints().get(0).validate("0:MyCompany-1.0.0")).isEmpty();
+        assertThat(ConstraintEvaluator.validate(entry.constraints().get(0), "GenericVnfm")).isPresent();
+        assertThat(ConstraintEvaluator.validate(entry.constraints().get(0), "0:MyCompany-1.0.0")).isEmpty();
     }
 }

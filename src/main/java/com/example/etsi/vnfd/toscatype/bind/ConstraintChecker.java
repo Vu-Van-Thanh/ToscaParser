@@ -5,6 +5,7 @@ import com.example.etsi.vnfd.template.value.PropertyValue;
 import com.example.etsi.vnfd.template.value.PropertyValueParser;
 import com.example.etsi.vnfd.template.value.ScalarUnitParser;
 import com.example.etsi.vnfd.typedef.Constraint;
+import com.example.etsi.vnfd.typedef.ConstraintEvaluator;
 import com.example.etsi.vnfd.typedef.PropertyDef;
 import com.example.etsi.vnfd.typedef.TypeHierarchy;
 import com.example.etsi.vnfd.validation.Findings;
@@ -97,7 +98,7 @@ public final class ConstraintChecker {
     private void checkAll(String name, List<Constraint> constraints, Object candidate,
             SourceRef source) {
         for (Constraint constraint : constraints) {
-            Optional<String> violation = constraint.validate(candidate);
+            Optional<String> violation = ConstraintEvaluator.validate(constraint, candidate);
             violation.ifPresent(message -> findings.warn("TOSCA03", CLAUSE_CONSTRAINTS,
                     "Property " + name + " violates constraint " + message, ref(source)));
         }
