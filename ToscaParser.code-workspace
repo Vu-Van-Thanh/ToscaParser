@@ -1,0 +1,138 @@
+{
+  // Open this file: File > Open Workspace from File...
+  //
+  // Two independent Maven projects. VS Code's Java extension imports the pom.xml it finds in a
+  // workspace folder and does NOT scan deeper, so with only the repository root open the demo is
+  // never imported and the debugger reports "the project etsi-vnfd-parser-demo is not a valid java
+  // project". Listing both folders is what makes the demo a project the launcher can resolve - and
+  // it is also what lets a breakpoint step from the demo into library source rather than bytecode.
+  "folders": [
+    { "name": "library", "path": "." },
+    { "name": "demo", "path": "demo" }
+  ],
+
+  "settings": {
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.import.maven.enabled": true,
+    "java.project.importOnFirstTimeStartup": "automatic",
+
+    "editor.rulers": [100],
+    "files.eol": "\n",
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+
+    "files.exclude": {
+      "**/target": true
+    },
+    "search.exclude": {
+      "**/target": true,
+      "docs/etsi-pdf-document": true
+    }
+  },
+
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        // The one F5 picks by default.
+        //
+        // preLaunchTask reinstalls the library first: the demo resolves etsi-vnfd-parser from the
+        // local repository, so without it a change under src/ would not reach the running app and
+        // you would be debugging the previous build.
+        "name": "Demo: Spring Boot (rebuild library first)",
+        "type": "java",
+        "request": "launch",
+        "mainClass": "com.example.etsi.vnfd.demo.Main",
+        "projectName": "etsi-vnfd-parser-demo",
+        "cwd": "${workspaceFolder:library}",
+        "preLaunchTask": "install parser library",
+        "console": "internalConsole",
+        "env": {
+          "SPRING_OUTPUT_ANSI_ENABLED": "ALWAYS"
+        }
+      },
+      {
+        // Same thing without the Maven install - a few seconds faster when only the demo changed.
+        "name": "Demo: Spring Boot (no rebuild)",
+        "type": "java",
+        "request": "launch",
+        "mainClass": "com.example.etsi.vnfd.demo.Main",
+        "projectName": "etsi-vnfd-parser-demo",
+        "cwd": "${workspaceFolder:library}",
+        "console": "internalConsole"
+      },
+      {
+        // Another port, for when 8080 is taken.
+        "name": "Demo: Spring Boot on :9000",
+        "type": "java",
+        "request": "launch",
+        "mainClass": "com.example.etsi.vnfd.demo.Main",
+        "projectName": "etsi-vnfd-parser-demo",
+        "cwd": "${workspaceFolder:library}",
+        "args": "--server.port=9000",
+        "console": "internalConsole"
+      },
+      {
+        // Attaches to an app already started from the command line with
+        //   mvnw spring-boot:run -Dspring-boot.run.jvmArguments="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+        "name": "Attach to running demo (:5005)",
+        "type": "java",
+        "request": "attach",
+        "hostName": "localhost",
+        "port": 5005
+      }
+    ]
+  },
+
+  "tasks": {
+    // Every task goes through the Maven wrapper rather than a bare `mvn`, because `mvn` is not
+    // necessarily on PATH - it is not on this machine - and the wrapper also pins one Maven version
+    // for everyone who opens the repository.
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "install parser library",
+        "type": "shell",
+        "command": "${workspaceFolder:library}/mvnw",
+        "windows": { "command": "${workspaceFolder:library}\\mvnw.cmd" },
+        "args": ["-q", "-DskipTests", "install"],
+        "options": { "cwd": "${workspaceFolder:library}" },
+        "problemMatcher": ["$maven"],
+        "presentation": {
+          "reveal": "silent",
+          "panel": "shared",
+          "clear": true
+        },
+        "group": "build"
+      },
+      {
+        "label": "library: test",
+        "type": "shell",
+        "command": "${workspaceFolder:library}/mvnw",
+        "windows": { "command": "${workspaceFolder:library}\\mvnw.cmd" },
+        "args": ["-o", "clean", "test"],
+        "options": { "cwd": "${workspaceFolder:library}" },
+        "problemMatcher": ["$maven"],
+        "group": { "kind": "test", "isDefault": true }
+      },
+      {
+        "label": "demo: package",
+        "type": "shell",
+        "command": "${workspaceFolder:library}/mvnw",
+        "windows": { "command": "${workspaceFolder:library}\\mvnw.cmd" },
+        "args": ["-q", "-f", "demo/pom.xml", "clean", "package", "-DskipTests"],
+        "options": { "cwd": "${workspaceFolder:library}" },
+        "problemMatcher": ["$maven"],
+        "group": "build"
+      }
+    ]
+  },
+
+  "extensions": {
+    "recommendations": [
+      "vscjava.vscode-java-pack",
+      "vmware.vscode-boot-dev-pack",
+      "redhat.vscode-yaml"
+    ]
+  }
+}
