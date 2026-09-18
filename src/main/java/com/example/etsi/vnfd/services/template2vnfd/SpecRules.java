@@ -149,6 +149,24 @@ final class SpecRules {
     }
 
     /**
+     * IFA011 V5.4.1 clause 7.1.8.2.2: {@code flavourId} is M,1 - a deployment flavour is identified
+     * by it, and {@code VnfDf.getFlavourId()} is how every other element refers to one.
+     *
+     * <p>Reported rather than guessed. A flavour with an empty identifier is not a flavour a caller
+     * can select, and silently emitting one is how a descriptor that says nothing useful passes for
+     * one that does.
+     */
+    static void flavourIdentified(VnfDf df, String sourceFile, Findings findings) {
+        if (df.getFlavourId().isEmpty()) {
+            findings.error("C29", "IFA011 V5.4.1 cl. 7.1.8.2.2",
+                    "The deployment flavour in " + sourceFile + " has no flavour_id: none is set by "
+                            + "substitution_filter, by the VNF node template, or by a default on "
+                            + "the VNF node type",
+                    sourceFile == null ? null : SourceRef.ofFile(sourceFile));
+        }
+    }
+
+    /**
      * IFA011 V5.4.1 clause 7.1.2.2 Note 6: one of virtualComputeDesc, osContainerDesc or mciopId
      * shall contain at least one element. Only the latter two exist in a CNF, so a VNFD declaring
      * neither describes no workload at all.

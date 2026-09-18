@@ -7,6 +7,7 @@ import com.example.etsi.vnfd.model.LcmOpParameterMappingScript;
 import com.example.etsi.vnfd.model.LcmRealizationPath;
 import com.example.etsi.vnfd.model.MciopProfile;
 import com.example.etsi.vnfd.model.OsContainerDesc;
+import com.example.etsi.vnfd.model.ScaleInfo;
 import com.example.etsi.vnfd.model.ScalingAspect;
 import com.example.etsi.vnfd.model.SwImageDesc;
 import com.example.etsi.vnfd.model.Vdu;
@@ -21,7 +22,10 @@ import com.example.etsi.vnfd.model.ext.MciopArtifacts;
 import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import com.example.etsi.vnfd.template.ArtifactDefinition;
 import com.example.etsi.vnfd.template.GroupDefinition;
+import com.example.etsi.vnfd.template.ParameterDefinition;
 import com.example.etsi.vnfd.template.PolicyDefinition;
+import com.example.etsi.vnfd.template.value.FunctionCall;
+import com.example.etsi.vnfd.template.value.FunctionName;
 import com.example.etsi.vnfd.template.value.PropertyValue;
 import com.example.etsi.vnfd.toscatype.artifact.HelmParamMappingScript;
 import com.example.etsi.vnfd.toscatype.artifact.SwImage;
@@ -479,8 +483,23 @@ final class PolicyMapper {
             policy.getProperties().getLevels().forEach((levelId, level) -> {
                 InstantiationLevel.Builder b =
                         builders.computeIfAbsent(levelId, InstantiationLevel::builder);
-                if (level != null && level.getDescription() != null) {
+                if (level == null) {
+                    return;
+                }
+                if (level.getDescription() != null) {
                     b.description(level.getDescription().resolved().orElse(null));
+                }
+                // IFA011 clause 7.1.8.7.2 gives InstantiationLevel.scaleInfo 0..N: for each aspect,
+                // the scale level this instantiation level corresponds to. SOL001 clause 6.10.1
+                // writes it as a map keyed by aspectId.
+                if (level.getScaleInfo() != null) {
+                    level.getScaleInfo().forEach((aspectId, info) -> {
+                        if (info == null || info.getScaleLevel() == null) {
+                            return;
+                        }
+                        info.getScaleLevel().resolved()
+                                .ifPresent(lvl -> b.addScaleInfo(ScaleInfo.of(aspectId, lvl)));
+                    });
                 }
             });
         }
@@ -556,6 +575,9 @@ final class PolicyMapper {
                     if (aspect.getMaxScaleLevel() != null) {
                         aspect.getMaxScaleLevel().resolved().ifPresent(b::maxScaleLevel);
                     }
+                    // IFA011 clause 7.1.8.8.2 stepDeltas: the scaling deltas applied for the
+                    // successive scaling steps of this aspect, in order.
+                    FlavourContext.orEmpty(aspect.getStepDeltas()).forEach(b::addStepDelta);
                 }
                 out.add(b.build());
             });
@@ -725,6 +747,7 @@ final class DeploymentFlavourMapper {
         policies.defaultInstantiationLevelId(context).ifPresent(builder::defaultInstantiationLevelId);
 
         Result result = new Result(builder.build());
+        SpecRules.flavourIdentified(result.df, context.template().file(), context.findings());
         for (Mciop mciop : context.mciops()) {
             result.mciopIds.add(IdRegistry.mciopId(mciop));
             mciops.mapScript(mciop).ifPresent(result.scripts::add);
@@ -748,10 +771,44 @@ final class DeploymentFlavourMapper {
         if (fromFilter.isPresent()) {
             return fromFilter;
         }
-        return context.vnf()
+
+        PropertyValue<String> declared = context.vnf()
                 .map(Vnf::getProperties)
                 .map(p -> p.getFlavourId())
-                .flatMap(v -> v == null ? Optional.empty() : v.resolved());
+                .orElse(null);
+        if (declared == null) {
+            return Optional.empty();
+        }
+        if (declared.isResolved()) {
+            return declared.resolved();
+        }
+        // The property is a TOSCA function. SOL001 V5.4.1 Table 5.9-2 lists VNF.flavour_id as one of
+        // the four places get_input is permitted, so a conformant descriptor can legitimately land
+        // here - and IFA011 clause 7.1.8.2.2 still makes flavourId M,1, so an empty identifier is
+        // not an acceptable answer.
+        //
+        // [MANO INTERPRETATION] The declared default of the input is used. It is part of the
+        // descriptor rather than a runtime value, and TOSCA Simple Profile YAML 1.3 clause 3.6.11
+        // defines it as the value to use when the consumer supplies none. No value is substituted
+        // from anywhere outside the package.
+        return inputDefault(context, declared);
+    }
+
+    /** The {@code default} of the input a {@code get_input} names, when the input declares one. */
+    private Optional<String> inputDefault(FlavourContext context, PropertyValue<String> value) {
+        if (!(value instanceof FunctionCall)) {
+            return Optional.empty();
+        }
+        FunctionCall<String> call = (FunctionCall<String>) value;
+        if (call.name() != FunctionName.GET_INPUT || call.args().isEmpty()) {
+            return Optional.empty();
+        }
+        return call.args().get(0).resolved()
+                .map(String::valueOf)
+                .flatMap(inputName -> Optional
+                        .ofNullable(context.topology().inputs().get(inputName))
+                        .flatMap(ParameterDefinition::defaultValue)
+                        .map(String::valueOf));
     }
 
     private Optional<String> flavourDescription(FlavourContext context) {
