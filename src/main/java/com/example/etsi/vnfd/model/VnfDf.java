@@ -35,6 +35,7 @@ public final class VnfDf {
     private final String defaultInstantiationLevelId;
     private final List<AffinityOrAntiAffinityGroup> affinityOrAntiAffinityGroup;
     private final List<ScalingAspect> scalingAspect;
+    private final List<DeployableModule> deployableModule;
     private final VnfLcmOperationsConfiguration vnfLcmOperationsConfiguration;
     private final String sourceFile;
 
@@ -51,6 +52,8 @@ public final class VnfDf {
         this.affinityOrAntiAffinityGroup =
                 Collections.unmodifiableList(new ArrayList<>(builder.affinityOrAntiAffinityGroup));
         this.scalingAspect = Collections.unmodifiableList(new ArrayList<>(builder.scalingAspect));
+        this.deployableModule =
+                Collections.unmodifiableList(new ArrayList<>(builder.deployableModule));
         this.vnfLcmOperationsConfiguration = builder.vnfLcmOperationsConfiguration;
         this.sourceFile = builder.sourceFile;
     }
@@ -101,6 +104,15 @@ public final class VnfDf {
         return scalingAspect;
     }
 
+    /**
+     * Sets of optional VDUs a consumer may choose to instantiate.
+     *
+     * <p>IFA011 clause 7.1.8.2.2: {@code deployableModule}, M,0..N.
+     */
+    public List<DeployableModule> getDeployableModule() {
+        return deployableModule;
+    }
+
     public Optional<VnfLcmOperationsConfiguration> getVnfLcmOperationsConfiguration() {
         return Optional.ofNullable(vnfLcmOperationsConfiguration);
     }
@@ -148,6 +160,7 @@ public final class VnfDf {
         private String defaultInstantiationLevelId;
         private final List<AffinityOrAntiAffinityGroup> affinityOrAntiAffinityGroup = new ArrayList<>();
         private final List<ScalingAspect> scalingAspect = new ArrayList<>();
+        private final List<DeployableModule> deployableModule = new ArrayList<>();
         private VnfLcmOperationsConfiguration vnfLcmOperationsConfiguration;
         private String sourceFile;
 
@@ -192,6 +205,11 @@ public final class VnfDf {
 
         public Builder addScalingAspect(ScalingAspect value) {
             scalingAspect.add(value);
+            return this;
+        }
+
+        public Builder addDeployableModule(DeployableModule value) {
+            deployableModule.add(value);
             return this;
         }
 

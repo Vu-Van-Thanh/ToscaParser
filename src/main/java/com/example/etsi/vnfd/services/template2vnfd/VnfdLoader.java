@@ -5,8 +5,12 @@ import com.example.etsi.vnfd.ParseResult;
 import com.example.etsi.vnfd.model.OsContainerDesc;
 import com.example.etsi.vnfd.model.SwImageDesc;
 import com.example.etsi.vnfd.model.Vdu;
+import com.example.etsi.vnfd.model.CertificateDesc;
 import com.example.etsi.vnfd.model.VduCpd;
 import com.example.etsi.vnfd.model.VnfExtCpd;
+import com.example.etsi.vnfd.model.VipCpd;
+import com.example.etsi.vnfd.model.VirtualCpd;
+import com.example.etsi.vnfd.model.VirtualStorageDesc;
 import com.example.etsi.vnfd.model.VnfVirtualLinkDesc;
 import com.example.etsi.vnfd.model.Vnfd;
 import com.example.etsi.vnfd.model.ext.MciopArtifacts;
@@ -18,10 +22,14 @@ import com.example.etsi.vnfd.template.PolicyDefinition;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
 import com.example.etsi.vnfd.template.TopologyTemplate;
 import com.example.etsi.vnfd.template.ToscaDescriptorTemplate;
+import com.example.etsi.vnfd.toscatype.node.Certificate;
 import com.example.etsi.vnfd.toscatype.node.Cp;
+import com.example.etsi.vnfd.toscatype.node.DeployableModule;
 import com.example.etsi.vnfd.toscatype.node.Mciop;
 import com.example.etsi.vnfd.toscatype.node.NfvNode;
 import com.example.etsi.vnfd.toscatype.node.VduCp;
+import com.example.etsi.vnfd.toscatype.node.VipCp;
+import com.example.etsi.vnfd.toscatype.node.VirtualCp;
 import com.example.etsi.vnfd.toscatype.node.VduOsContainer;
 import com.example.etsi.vnfd.toscatype.node.VduOsContainerDeployableUnit;
 import com.example.etsi.vnfd.toscatype.node.Vnf;
@@ -79,6 +87,7 @@ public final class VnfdLoader {
         ArtifactSelector artifacts = new ArtifactSelector(hierarchy);
         NodeBinder binder = new NodeBinder(hierarchy, NodeTypes.ALL, findings);
         SwImageMapper swImages = new SwImageMapper(mapper);
+        StorageMapper storages = new StorageMapper(mapper);
         DeploymentFlavourMapper flavourMapper =
                 new DeploymentFlavourMapper(hierarchy, artifacts, mapper);
 
@@ -97,7 +106,7 @@ public final class VnfdLoader {
                 headerRead = true;
             }
 
-            List<Vdu> flavourVdus = collectNodes(context, artifacts, swImages, merged);
+            List<Vdu> flavourVdus = collectNodes(context, artifacts, swImages, storages, merged);
 
             DeploymentFlavourMapper.Result result = flavourMapper.map(context);
             SpecRules.flavour(result.df, flavourVdus, findings);
@@ -113,6 +122,10 @@ public final class VnfdLoader {
         merged.vduCpds.values().forEach(builder::addVduCpd);
         merged.extCpds.values().forEach(builder::addVnfExtCpd);
         merged.links.values().forEach(builder::addIntVirtualLinkDesc);
+        merged.storages.values().forEach(builder::addVirtualStorageDesc);
+        merged.vipCpds.values().forEach(builder::addVipCpd);
+        merged.virtualCpds.values().forEach(builder::addVirtualCpd);
+        merged.certificates.values().forEach(builder::addCertificateDesc);
         mciopIds.forEach(builder::addMciopId);
 
         if (!mciopArtifacts.isEmpty()) {
@@ -128,7 +141,7 @@ public final class VnfdLoader {
 
     /** Maps every node of one flavour into the shared pool, and returns that flavour's VDUs. */
     private List<Vdu> collectNodes(FlavourContext context, ArtifactSelector artifacts,
-            SwImageMapper swImages, Merged merged) {
+            SwImageMapper swImages, StorageMapper storages, Merged merged) {
 
         List<Vdu> flavourVdus = new ArrayList<>();
         for (VduOsContainerDeployableUnit vdu : context.vdus()) {
@@ -159,6 +172,27 @@ public final class VnfdLoader {
         for (VnfVirtualLink link : context.virtualLinks().values()) {
             merged.links.putIfAbsent(IdRegistry.virtualLinkDescId(link), VirtualLinkMapper.map(link));
         }
+        // SOL001 gives block, object and file storage three node types; IFA011 clause 7.1.9.4.2 has
+        // one information element carrying a typeOfStorage, so the node type is what decides it.
+        for (NfvNode storage : context.storages()) {
+            storages.map(storage).ifPresent(desc ->
+                    merged.storages.putIfAbsent(desc.getId(), desc));
+        }
+        // Neither a VipCp nor a VirtualCp is a VduCp, so neither can go through the loop above:
+        // they carry a `target` requirement where a VduCp carries `virtual_binding`.
+        for (Cp cp : context.connectionPoints().values()) {
+            if (cp instanceof VipCp) {
+                merged.vipCpds.putIfAbsent(IdRegistry.cpdId(cp),
+                        SpecialCpMapper.mapVipCp((VipCp) cp));
+            } else if (cp instanceof VirtualCp) {
+                merged.virtualCpds.putIfAbsent(IdRegistry.cpdId(cp),
+                        SpecialCpMapper.mapVirtualCp((VirtualCp) cp));
+            }
+        }
+        for (Certificate certificate : context.certificates()) {
+            merged.certificates.putIfAbsent(IdRegistry.certificateDescId(certificate),
+                    ModuleAndCertificateMapper.mapCertificate(certificate));
+        }
         return flavourVdus;
     }
 
@@ -173,6 +207,10 @@ public final class VnfdLoader {
         final Map<String, VduCpd> vduCpds = new LinkedHashMap<>();
         final Map<String, VnfExtCpd> extCpds = new LinkedHashMap<>();
         final Map<String, VnfVirtualLinkDesc> links = new LinkedHashMap<>();
+        final Map<String, VirtualStorageDesc> storages = new LinkedHashMap<>();
+        final Map<String, VipCpd> vipCpds = new LinkedHashMap<>();
+        final Map<String, VirtualCpd> virtualCpds = new LinkedHashMap<>();
+        final Map<String, CertificateDesc> certificates = new LinkedHashMap<>();
     }
 }
 
@@ -197,6 +235,8 @@ final class FlavourContext {
     private final Map<String, VnfVirtualLink> virtualLinks = new LinkedHashMap<>();
     private final List<Mciop> mciops = new ArrayList<>();
     private final List<NfvNode> storages = new ArrayList<>();
+    private final List<Certificate> certificates = new ArrayList<>();
+    private final List<DeployableModule> deployableModules = new ArrayList<>();
     private Vnf vnf;
 
     private final Map<String, List<String>> cpsByVdu = new LinkedHashMap<>();
@@ -234,6 +274,10 @@ final class FlavourContext {
                 mciops.add((Mciop) node);
             } else if (isStorage(node)) {
                 storages.add(node);
+            } else if (node instanceof Certificate) {
+                certificates.add((Certificate) node);
+            } else if (node instanceof DeployableModule) {
+                deployableModules.add((DeployableModule) node);
             }
         }
     }
@@ -309,6 +353,14 @@ final class FlavourContext {
         return storages;
     }
 
+    List<Certificate> certificates() {
+        return certificates;
+    }
+
+    List<DeployableModule> deployableModules() {
+        return deployableModules;
+    }
+
     List<PolicyDefinition> policies() {
         return topology.policies();
     }
@@ -375,6 +427,28 @@ final class IdRegistry {
 
     /** [ASSUMPTION] As above. */
     static String cpdId(NfvNode node) {
+        return node.getKey();
+    }
+
+    /**
+     * {@code CertificateDesc.id}, IFA011 clause 7.1.19.2.2 - M,1.
+     *
+     * <p>[ASSUMPTION] The node template name. SOL001 clause 6.8.19 does not say how the identifier
+     * is derived; the only place SOL001 states that rule outright is clause 6.8.12.6, for
+     * SwImageDesc.
+     */
+    static String certificateDescId(NfvNode node) {
+        return node.getKey();
+    }
+
+    /**
+     * {@code DeployableModule.deployableModuleId}, IFA011 clause 7.1.8.24.2 - M,1.
+     *
+     * <p>[ASSUMPTION] The node template name, for the same reason as above. Note the identifier has
+     * to agree with whatever {@code VduProfile.deployableModule} names, since that is the reference
+     * IFA011 uses to attach a VDU to a module.
+     */
+    static String deployableModuleId(NfvNode node) {
         return node.getKey();
     }
 

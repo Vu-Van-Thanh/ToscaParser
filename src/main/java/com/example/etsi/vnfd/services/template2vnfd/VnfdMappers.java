@@ -1,7 +1,9 @@
 package com.example.etsi.vnfd.services.template2vnfd;
 
 import com.example.etsi.vnfd.model.AffinityOrAntiAffinityGroup;
+import com.example.etsi.vnfd.model.CertificateDesc;
 import com.example.etsi.vnfd.model.Cpd;
+import com.example.etsi.vnfd.model.DeployableModule;
 import com.example.etsi.vnfd.model.InstantiationLevel;
 import com.example.etsi.vnfd.model.LcmOpParameterMappingScript;
 import com.example.etsi.vnfd.model.LcmRealizationPath;
@@ -16,6 +18,9 @@ import com.example.etsi.vnfd.model.VduLevel;
 import com.example.etsi.vnfd.model.VduProfile;
 import com.example.etsi.vnfd.model.VnfDf;
 import com.example.etsi.vnfd.model.VnfExtCpd;
+import com.example.etsi.vnfd.model.VipCpd;
+import com.example.etsi.vnfd.model.VirtualCpd;
+import com.example.etsi.vnfd.model.VirtualStorageDesc;
 import com.example.etsi.vnfd.model.VnfVirtualLinkDesc;
 import com.example.etsi.vnfd.model.Vnfd;
 import com.example.etsi.vnfd.model.ext.MciopArtifacts;
@@ -31,10 +36,17 @@ import com.example.etsi.vnfd.toscatype.artifact.HelmParamMappingScript;
 import com.example.etsi.vnfd.toscatype.artifact.SwImage;
 import com.example.etsi.vnfd.toscatype.node.Cp;
 import com.example.etsi.vnfd.toscatype.node.Mciop;
+import com.example.etsi.vnfd.toscatype.data.TypeOfStorage;
+import com.example.etsi.vnfd.toscatype.node.Certificate;
 import com.example.etsi.vnfd.toscatype.node.NfvNode;
 import com.example.etsi.vnfd.toscatype.node.VduCp;
 import com.example.etsi.vnfd.toscatype.node.VduOsContainer;
 import com.example.etsi.vnfd.toscatype.node.VduOsContainerDeployableUnit;
+import com.example.etsi.vnfd.toscatype.node.VduVirtualBlockStorage;
+import com.example.etsi.vnfd.toscatype.node.VduVirtualFileStorage;
+import com.example.etsi.vnfd.toscatype.node.VduVirtualObjectStorage;
+import com.example.etsi.vnfd.toscatype.node.VipCp;
+import com.example.etsi.vnfd.toscatype.node.VirtualCp;
 import com.example.etsi.vnfd.toscatype.node.Vnf;
 import com.example.etsi.vnfd.toscatype.node.VnfExtCp;
 import com.example.etsi.vnfd.toscatype.node.VnfVirtualLink;
@@ -255,7 +267,7 @@ final class CpMapper {
     /** SOL001 clause 6.8.8 VduCp (and clause 6.8.11 VduSubCp) to VduCpd. */
     static VduCpd mapVduCp(VduCp node) {
         VduCpd.Builder builder = VduCpd.builder(IdRegistry.cpdId(node));
-        common(node, builder);
+        applyCommon(node, builder);
         if (node.getRequirements() != null) {
             FlavourContext.first(node.getRequirements().getVirtualBinding())
                     .ifPresent(builder::vduId);
@@ -268,7 +280,7 @@ final class CpMapper {
     /** SOL001 clause 6.8.2 VnfExtCp, declared explicitly, to VnfExtCpd. */
     static VnfExtCpd mapVnfExtCp(VnfExtCp node) {
         VnfExtCpd.Builder builder = VnfExtCpd.builder(IdRegistry.cpdId(node));
-        common(node, builder);
+        applyCommon(node, builder);
         if (node.getRequirements() != null) {
             // SOL001 Table 6.8.2.4-1 names them internal_virtual_link and external_virtual_link;
             // the internal one is what IFA011 calls intVirtualLinkDesc.
@@ -286,7 +298,7 @@ final class CpMapper {
      */
     static VnfExtCpd mapExposedCp(Cp node) {
         VnfExtCpd.Builder builder = VnfExtCpd.builder(IdRegistry.cpdId(node));
-        common(node, builder);
+        applyCommon(node, builder);
         builder.intCpd(IdRegistry.cpdId(node));
         builder.exposedThroughSubstitution(true);
         if (node instanceof VduCp && ((VduCp) node).getRequirements() != null) {
@@ -297,7 +309,7 @@ final class CpMapper {
     }
 
     /** What every connection point descriptor shares - IFA011 clause 7.1.6.3 {@code Cpd}. */
-    private static void common(Cp node, Cpd.AbstractBuilder<?> builder) {
+    static void applyCommon(Cp node, Cpd.AbstractBuilder<?> builder) {
         Cp.Properties p = node.getProperties();
         if (p == null) {
             return;
@@ -739,6 +751,11 @@ final class DeploymentFlavourMapper {
 
         policies.scalingAspects(context).forEach(builder::addScalingAspect);
 
+        // IFA011 Table 7.1.8.2.2-1 puts deployableModule on the flavour, not on the VNFD: the set
+        // of optional VDUs is what a consumer selects when instantiating this flavour.
+        context.deployableModules().forEach(m ->
+                builder.addDeployableModule(ModuleAndCertificateMapper.mapDeployableModule(m)));
+
         List<InstantiationLevel> levels = policies.instantiationLevels(context);
         if (levels.isEmpty()) {
             levels = Collections.singletonList(PolicyMapper.synthesiseLevel(minInstances));
@@ -830,6 +847,172 @@ final class DeploymentFlavourMapper {
                     .forEach(builder::addModifyCapacityAttributesOp);
         }
         affinity.groupsOf(vdu.getKey()).forEach(builder::addAffinityGroup);
+        return builder.build();
+    }
+}
+
+/**
+ * SOL001 V5.4.1 clauses 6.8.4 / 6.8.5 / 6.8.6 {@code Vdu.Virtual*Storage} to IFA011 V5.4.1 clause
+ * 7.1.9.4.2 {@code VirtualStorageDesc}.
+ *
+ * <p>The kind of storage comes from the node TYPE, not from a property: SOL001 gives block, object
+ * and file storage three separate node types, each with its own data property, while IFA011 has one
+ * information element carrying a {@code typeOfStorage}. Walking {@code derived_from} is what turns
+ * one into the other, so a vendor type derived from any of the three still classifies.
+ */
+final class StorageMapper {
+
+    private final ObjectMapper mapper;
+
+    StorageMapper(ObjectMapper mapper) {
+        this.mapper = mapper;
+    }
+
+    /** Empty when the node is not one of the three storage types. */
+    Optional<VirtualStorageDesc> map(NfvNode node) {
+        if (node instanceof VduVirtualBlockStorage) {
+            VduVirtualBlockStorage.Properties p = ((VduVirtualBlockStorage) node).getProperties();
+            return Optional.of(build(node, TypeOfStorage.BLOCK,
+                    p == null ? null : p.getVirtualBlockStorageData(),
+                    p == null ? null : p.getPerVnfcInstance(),
+                    p == null ? null : p.getNfviMaintenanceInfo()));
+        }
+        if (node instanceof VduVirtualObjectStorage) {
+            VduVirtualObjectStorage.Properties p = ((VduVirtualObjectStorage) node).getProperties();
+            return Optional.of(build(node, TypeOfStorage.OBJECT,
+                    p == null ? null : p.getVirtualObjectStorageData(),
+                    p == null ? null : p.getPerVnfcInstance(),
+                    p == null ? null : p.getNfviMaintenanceInfo()));
+        }
+        if (node instanceof VduVirtualFileStorage) {
+            VduVirtualFileStorage.Properties p = ((VduVirtualFileStorage) node).getProperties();
+            return Optional.of(build(node, TypeOfStorage.FILE,
+                    p == null ? null : p.getVirtualFileStorageData(),
+                    p == null ? null : p.getPerVnfcInstance(),
+                    p == null ? null : p.getNfviMaintenanceInfo()));
+        }
+        return Optional.empty();
+    }
+
+    private VirtualStorageDesc build(NfvNode node, TypeOfStorage type,
+            Object storageData, PropertyValue<Boolean> perVnfcInstance, Object maintenance) {
+        VirtualStorageDesc.Builder builder =
+                VirtualStorageDesc.builder(IdRegistry.virtualStorageDescId(node), type);
+        if (storageData != null) {
+            builder.storageData(asMap(storageData));
+        }
+        if (perVnfcInstance != null) {
+            builder.perVnfcInstance(perVnfcInstance);
+        }
+        if (maintenance != null) {
+            builder.nfviMaintenanceInfo(asMap(maintenance));
+        }
+        return builder.build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> asMap(Object value) {
+        return mapper.convertValue(value, Map.class);
+    }
+}
+
+/**
+ * SOL001 V5.4.1 clause 6.8.10 {@code VipCp} to IFA011 V5.4.1 clause 7.1.17.2 {@code VipCpd}, and
+ * clause 6.8.15 {@code VirtualCp} to clause 7.1.18.2 {@code VirtualCpd}.
+ *
+ * <p>Both are connection points, so both inherit every attribute of the Cpd, but they differ in what
+ * they point at: a VipCp targets the VduCps that will share the address (clause 6.8.10), while a
+ * VirtualCp targets the deployable units implementing the service (clause 6.8.15). That is why
+ * neither can go through the VduCp path, which reads a {@code virtual_binding} neither of them has.
+ */
+final class SpecialCpMapper {
+
+    private SpecialCpMapper() {
+    }
+
+    /** IFA011 clause 7.1.17.2. */
+    static VipCpd mapVipCp(VipCp node) {
+        VipCpd.Builder builder = VipCpd.builder(IdRegistry.cpdId(node));
+        CpMapper.applyCommon(node, builder);
+
+        VipCp.Properties p = node.getProperties();
+        if (p != null) {
+            builder.dedicatedIpAddress(p.getDedicatedIpAddress())
+                   .vipFunction(p.getVipFunction());
+        }
+        VipCp.Requirements r = node.getRequirements();
+        if (r != null) {
+            // Table 6.8.10.4-1: target has occurrences [1, UNBOUNDED] and points at VduCp nodes,
+            // which is exactly IFA011 intCpd (M,1..N, a reference to VduCpd).
+            FlavourContext.orEmpty(r.getTarget()).forEach(builder::addIntCpd);
+            FlavourContext.first(r.getVirtualLink()).ifPresent(builder::intVirtualLinkDesc);
+        }
+        return builder.build();
+    }
+
+    /** IFA011 clause 7.1.18.2. */
+    static VirtualCpd mapVirtualCp(VirtualCp node) {
+        VirtualCpd.Builder builder = VirtualCpd.builder(IdRegistry.cpdId(node));
+        CpMapper.applyCommon(node, builder);
+
+        VirtualCp.Properties p = node.getProperties();
+        if (p != null && p.getAdditionalServiceData() != null) {
+            p.getAdditionalServiceData().forEach(d -> builder.addAdditionalServiceData(
+                    ToscaBindModule.mapper().convertValue(d, Map.class)));
+        }
+        VirtualCp.Requirements r = node.getRequirements();
+        if (r != null) {
+            FlavourContext.orEmpty(r.getTarget()).forEach(builder::addVdu);
+        }
+        return builder.build();
+    }
+}
+
+/**
+ * SOL001 V5.4.1 clause 6.8.19 {@code Certificate} to IFA011 V5.4.1 clause 7.1.19.2
+ * {@code CertificateDesc}, and clause 6.8.16 {@code DeployableModule} to clause 7.1.8.24.
+ *
+ * <p>The two are unrelated but share a shape: a node type whose whole content is a couple of
+ * properties and a list of members, with nothing to derive or cross-reference.
+ */
+final class ModuleAndCertificateMapper {
+
+    private ModuleAndCertificateMapper() {
+    }
+
+    /** IFA011 clause 7.1.19.2. */
+    static CertificateDesc mapCertificate(Certificate node) {
+        CertificateDesc.Builder builder =
+                CertificateDesc.builder(IdRegistry.certificateDescId(node));
+        Certificate.Properties p = node.getProperties();
+        if (p != null) {
+            builder.name(p.getName()).certificateType(p.getCertificateType());
+            if (p.getCertificateBaseProfile() != null) {
+                builder.certificateBaseProfile(
+                        ToscaBindModule.mapper().convertValue(p.getCertificateBaseProfile(), Map.class));
+            }
+            if (p.getCsrRequirements() != null) {
+                p.getCsrRequirements().forEach(r -> builder.addCsrRequirement(
+                        ToscaBindModule.mapper().convertValue(r, Map.class)));
+            }
+        }
+        return builder.build();
+    }
+
+    /** IFA011 clause 7.1.8.24 - an attribute of the deployment flavour, not of the VNFD. */
+    static DeployableModule mapDeployableModule(
+            com.example.etsi.vnfd.toscatype.node.DeployableModule node) {
+        DeployableModule.Builder builder =
+                DeployableModule.builder(IdRegistry.deployableModuleId(node));
+        com.example.etsi.vnfd.toscatype.node.DeployableModule.Properties p = node.getProperties();
+        if (p != null) {
+            builder.name(p.getName()).description(p.getDescription());
+        }
+        com.example.etsi.vnfd.toscatype.node.DeployableModule.Requirements r = node.getRequirements();
+        if (r != null) {
+            // Table 6.8.16.4-1: member has occurrences [1, UNBOUNDED].
+            FlavourContext.orEmpty(r.getMember()).forEach(builder::addMember);
+        }
         return builder.build();
     }
 }

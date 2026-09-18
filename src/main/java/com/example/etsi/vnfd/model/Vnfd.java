@@ -43,6 +43,9 @@ public final class Vnfd {
     private final List<VnfVirtualLinkDesc> intVirtualLinkDesc;
     private final List<VduCpd> vduCpd;
     private final List<VnfExtCpd> vnfExtCpd;
+    private final List<VipCpd> vipCpd;
+    private final List<VirtualCpd> virtualCpd;
+    private final List<CertificateDesc> certificateDesc;
     private final List<VnfDf> df;
     private final List<String> mciopId;
     private final List<LcmOpParameterMappingScript> lcmOpParameterMappingScript;
@@ -68,6 +71,9 @@ public final class Vnfd {
         this.intVirtualLinkDesc = Collections.unmodifiableList(new ArrayList<>(b.intVirtualLinkDesc));
         this.vduCpd = Collections.unmodifiableList(new ArrayList<>(b.vduCpd));
         this.vnfExtCpd = Collections.unmodifiableList(new ArrayList<>(b.vnfExtCpd));
+        this.vipCpd = Collections.unmodifiableList(new ArrayList<>(b.vipCpd));
+        this.virtualCpd = Collections.unmodifiableList(new ArrayList<>(b.virtualCpd));
+        this.certificateDesc = Collections.unmodifiableList(new ArrayList<>(b.certificateDesc));
         this.df = Collections.unmodifiableList(new ArrayList<>(b.df));
         this.mciopId = Collections.unmodifiableList(new ArrayList<>(b.mciopId));
         this.lcmOpParameterMappingScript =
@@ -165,6 +171,21 @@ public final class Vnfd {
         return vnfExtCpd;
     }
 
+    /** Virtual IP address requirements. IFA011 clause 7.1.2.2: {@code vipCpd}, M,0..N. */
+    public List<VipCpd> getVipCpd() {
+        return vipCpd;
+    }
+
+    /** Virtual connection points. IFA011 clause 7.1.2.2: {@code virtualCpd}, M,0..N. */
+    public List<VirtualCpd> getVirtualCpd() {
+        return virtualCpd;
+    }
+
+    /** Certificates the VNF uses. IFA011 clause 7.1.2.2: {@code certificateDesc}, M,0..N. */
+    public List<CertificateDesc> getCertificateDesc() {
+        return certificateDesc;
+    }
+
     /** Deployment flavours. IFA011 names this attribute deploymentFlavour. */
     public List<VnfDf> getDf() {
         return df;
@@ -223,6 +244,9 @@ public final class Vnfd {
         private final List<VnfVirtualLinkDesc> intVirtualLinkDesc = new ArrayList<>();
         private final List<VduCpd> vduCpd = new ArrayList<>();
         private final List<VnfExtCpd> vnfExtCpd = new ArrayList<>();
+        private final List<VipCpd> vipCpd = new ArrayList<>();
+        private final List<VirtualCpd> virtualCpd = new ArrayList<>();
+        private final List<CertificateDesc> certificateDesc = new ArrayList<>();
         private final List<VnfDf> df = new ArrayList<>();
         private final List<String> mciopId = new ArrayList<>();
         private final List<LcmOpParameterMappingScript> lcmOpParameterMappingScript = new ArrayList<>();
@@ -337,6 +361,21 @@ public final class Vnfd {
             if (value != null) {
                 vnfExtCpd.add(value);
             }
+            return this;
+        }
+
+        public Builder addVipCpd(VipCpd value) {
+            vipCpd.add(value);
+            return this;
+        }
+
+        public Builder addVirtualCpd(VirtualCpd value) {
+            virtualCpd.add(value);
+            return this;
+        }
+
+        public Builder addCertificateDesc(CertificateDesc value) {
+            certificateDesc.add(value);
             return this;
         }
 

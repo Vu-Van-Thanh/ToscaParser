@@ -1,7 +1,9 @@
 package com.example.etsi.vnfd.demo;
 
 import com.example.etsi.vnfd.model.AffinityOrAntiAffinityGroup;
+import com.example.etsi.vnfd.model.CertificateDesc;
 import com.example.etsi.vnfd.model.Cpd;
+import com.example.etsi.vnfd.model.DeployableModule;
 import com.example.etsi.vnfd.model.InstantiationLevel;
 import com.example.etsi.vnfd.model.LcmOpParameterMappingScript;
 import com.example.etsi.vnfd.model.LifeCycleManagementScript;
@@ -18,6 +20,8 @@ import com.example.etsi.vnfd.model.VirtualLinkProfile;
 import com.example.etsi.vnfd.model.VirtualStorageDesc;
 import com.example.etsi.vnfd.model.VnfDf;
 import com.example.etsi.vnfd.model.VnfExtCpd;
+import com.example.etsi.vnfd.model.VipCpd;
+import com.example.etsi.vnfd.model.VirtualCpd;
 import com.example.etsi.vnfd.model.VnfVirtualLinkDesc;
 import com.example.etsi.vnfd.model.Vnfd;
 import com.example.etsi.vnfd.model.ext.MciopArtifacts;
@@ -151,6 +155,9 @@ public final class VnfdJson {
         list(n, "intVirtualLinkDesc", vnfd.getIntVirtualLinkDesc(), VnfdJson::virtualLinkDesc);
         list(n, "vduCpd", vnfd.getVduCpd(), VnfdJson::vduCpd);
         list(n, "vnfExtCpd", vnfd.getVnfExtCpd(), VnfdJson::vnfExtCpd);
+        list(n, "vipCpd", vnfd.getVipCpd(), VnfdJson::vipCpd);
+        list(n, "virtualCpd", vnfd.getVirtualCpd(), VnfdJson::virtualCpd);
+        list(n, "certificateDesc", vnfd.getCertificateDesc(), VnfdJson::certificateDesc);
 
         // IFA011 names this attribute deploymentFlavour; the JSON field is "df" by project decision.
         list(n, "df", vnfd.getDf(), VnfdJson::df);
@@ -263,6 +270,45 @@ public final class VnfdJson {
         return n;
     }
 
+    /** IFA011 V5.4.1 clause 7.1.17.2. */
+    public static ObjectNode vipCpd(VipCpd c) {
+        ObjectNode n = cpd(c);
+        strings(n, "intCpd", c.getIntCpd());
+        put(n, "intVirtualLinkDesc", c.getIntVirtualLinkDesc());
+        property(n, "dedicatedIpAddress", c.getDedicatedIpAddress());
+        property(n, "vipFunction", c.getVipFunction());
+        return n;
+    }
+
+    /** IFA011 V5.4.1 clause 7.1.18.2. */
+    public static ObjectNode virtualCpd(VirtualCpd c) {
+        ObjectNode n = cpd(c);
+        strings(n, "vdu", c.getVdu());
+        maps(n, "additionalServiceData", c.getAdditionalServiceData());
+        return n;
+    }
+
+    /** IFA011 V5.4.1 clause 7.1.19.2. */
+    public static ObjectNode certificateDesc(CertificateDesc c) {
+        ObjectNode n = object();
+        n.put("id", c.getId());
+        property(n, "name", c.getName());
+        property(n, "certificateType", c.getCertificateType());
+        maps(n, "csrRequirements", c.getCsrRequirements());
+        map(n, "certificateBaseProfile", c.getCertificateBaseProfile());
+        return n;
+    }
+
+    /** IFA011 V5.4.1 clause 7.1.8.24. */
+    public static ObjectNode deployableModule(DeployableModule m) {
+        ObjectNode n = object();
+        n.put("deployableModuleId", m.getDeployableModuleId());
+        property(n, "name", m.getName());
+        property(n, "description", m.getDescription());
+        strings(n, "member", m.getMember());
+        return n;
+    }
+
     private static ObjectNode cpd(Cpd c) {
         ObjectNode n = object();
         n.put("cpdId", c.getCpdId());
@@ -287,6 +333,7 @@ public final class VnfdJson {
         list(n, "affinityOrAntiAffinityGroup", df.getAffinityOrAntiAffinityGroup(),
                 VnfdJson::affinityGroup);
         list(n, "scalingAspect", df.getScalingAspect(), VnfdJson::scalingAspect);
+        list(n, "deployableModule", df.getDeployableModule(), VnfdJson::deployableModule);
         df.getVnfLcmOperationsConfiguration().filter(c -> !c.isEmpty()).ifPresent(c -> {
             ObjectNode cfg = object();
             c.getOpConfigs().forEach((k, v) -> cfg.set(k, MAPPER.valueToTree(v)));
