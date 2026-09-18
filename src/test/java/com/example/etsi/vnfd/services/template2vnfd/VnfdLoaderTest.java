@@ -1,7 +1,8 @@
-package com.example.etsi.vnfd.map;
+package com.example.etsi.vnfd.services.template2vnfd;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.etsi.vnfd.ParseResult;
 import com.example.etsi.vnfd.ToscaParser;
 import com.example.etsi.vnfd.fixture.Fixtures;
 import com.example.etsi.vnfd.model.LcmRealizationPath;

@@ -1,4 +1,4 @@
-package com.example.etsi.vnfd.map;
+package com.example.etsi.vnfd.services.template2vnfd;
 
 /**
  * The package could not be read at all.

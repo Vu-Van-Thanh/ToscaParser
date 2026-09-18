@@ -1,4 +1,4 @@
-package com.example.etsi.vnfd.toscatype.bind;
+package com.example.etsi.vnfd.services.template2vnfd;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

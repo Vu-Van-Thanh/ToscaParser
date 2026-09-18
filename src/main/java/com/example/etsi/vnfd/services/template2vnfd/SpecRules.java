@@ -1,4 +1,4 @@
-package com.example.etsi.vnfd.map;
+package com.example.etsi.vnfd.services.template2vnfd;
 
 import com.example.etsi.vnfd.model.LcmRealizationPath;
 import com.example.etsi.vnfd.model.Vdu;

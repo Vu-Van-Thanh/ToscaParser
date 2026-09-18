@@ -1,4 +1,4 @@
-package com.example.etsi.vnfd.map;
+package com.example.etsi.vnfd;
 
 import com.example.etsi.vnfd.model.Vnfd;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
@@ -20,7 +20,7 @@ public final class ParseResult {
     private final ServiceToscaTemplate template;
     private final List<Finding> findings;
 
-    ParseResult(Vnfd vnfd, ServiceToscaTemplate template, Findings findings) {
+    public ParseResult(Vnfd vnfd, ServiceToscaTemplate template, Findings findings) {
         this.vnfd = vnfd;
         this.template = template;
         this.findings = findings.asList();

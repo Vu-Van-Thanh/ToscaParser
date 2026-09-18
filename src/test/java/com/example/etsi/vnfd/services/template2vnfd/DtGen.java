@@ -1,9 +1,8 @@
-package com.example.etsi.vnfd;
+package com.example.etsi.vnfd.services.template2vnfd;
 
 import com.example.etsi.vnfd.fixture.Fixtures;
-import com.example.etsi.vnfd.services.pkg2template.PackageReader;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
-import com.example.etsi.vnfd.toscatype.bind.NodeTypes;
+import com.example.etsi.vnfd.services.pkg2template.PackageReader;
 import com.example.etsi.vnfd.toscatype.node.EtsiNodeType;
 import com.example.etsi.vnfd.typedef.PropertyDef;
 import com.example.etsi.vnfd.services.pkg2template.TypeReader;
@@ -89,7 +88,7 @@ class DtGen {
 
         b.append("package ").append(PKG).append(";\n\n");
         imports.forEach(i -> b.append("import ").append(i).append(";\n"));
-        b.append("\n").append(NodeGen.doc(fqn));
+        b.append("\n").append(com.example.etsi.vnfd.NodeGen.doc(fqn));
         b.append("@Getter\n@Setter\n@NoArgsConstructor\n@JsonIgnoreProperties(ignoreUnknown = true)\n");
         b.append("public class ").append(simple).append(" {\n\n");
         b.append(body);

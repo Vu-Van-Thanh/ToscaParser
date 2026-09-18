@@ -1,7 +1,7 @@
 package com.example.etsi.vnfd;
 
-import com.example.etsi.vnfd.map.ParseResult;
-import com.example.etsi.vnfd.map.VnfdLoader;
+import com.example.etsi.vnfd.ParseResult;
+import com.example.etsi.vnfd.services.template2vnfd.VnfdLoader;
 import com.example.etsi.vnfd.services.pkg2template.PackageReader;
 import com.example.etsi.vnfd.template.ServiceToscaTemplate;
 import com.example.etsi.vnfd.validation.Findings;

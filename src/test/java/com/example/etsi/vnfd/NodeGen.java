@@ -14,7 +14,7 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 
 /** Generates the SOL001 node classes from the ETSI type definitions. Not part of the build. */
-class NodeGen {
+public class NodeGen {
 
     private static final String OUT = "target/nodegen";
     private static final String PKG = "com.example.etsi.vnfd.toscatype.node";
@@ -112,7 +112,7 @@ class NodeGen {
     }
 
     /** Javadoc built from the specification text; the type definitions carry no clause numbers. */
-    static String doc(String toscaType) {
+    public static String doc(String toscaType) {
         StringBuilder b = new StringBuilder("/**\n");
         boolean firstPara = true;
         for (String line : Sol001Doc.javadoc(toscaType)) {
