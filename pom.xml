@@ -106,7 +106,36 @@
           <artifactId>maven-install-plugin</artifactId>
           <version>3.1.2</version>
         </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>3.3.1</version>
+        </plugin>
       </plugins>
     </pluginManagement>
+
+    <plugins>
+      <!--
+        Build the sources jar every time, rather than only when someone remembers `mvn source:jar`.
+
+        A consumer resolves this library from the local repository and the IDE attaches the sources
+        jar to step into it. `mvn install` on its own rebuilds only the main jar, so the sources jar
+        survives from whenever it was last generated - and then the debugger shows source that no
+        longer matches the bytecode, with variables that do not line up with the code on screen.
+        Silent, and it looks like a broken debugger rather than a stale file.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
   </build>
 </project>
