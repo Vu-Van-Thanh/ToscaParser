@@ -33,8 +33,9 @@ re-deriving ETSI mapping rules from scratch each session.
   Non-conformant packages live separately, in `src/test/resources/negative/` - one per broken SHALL,
   with a README of their own.
 
-- `demo/` at the repository root is a separate Maven project that consumes the parser as a library
-  and serves any of these packages as JSON over HTTP. `GET /parse-all` prints one row per package.
+- `etsi-vnfd-parser-demo`, a separate repository, consumes the parser as a library and serves any of
+  these packages as JSON over HTTP. It keeps its own copies, so changing a package here does not
+  change what it serves.
 
 
 ## Not included here (add yourself)

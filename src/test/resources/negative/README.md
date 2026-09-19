@@ -48,9 +48,10 @@ cannot produce. Recorded here instead.
 
 ## Checking them
 
-With the demo server running (`cd demo && mvn exec:java`):
+From the test suite, or through the `etsi-vnfd-parser-demo` project, which keeps its own copy of
+these packages under `packages/negative/`:
 
 ```
-curl "localhost:8139/findings?pkg=neg_C4_two_helm_charts&pretty=1"
-curl "localhost:8139/parse-all"        # one summary row per package, both roots
+curl "localhost:8080/findings?pkg=neg_C4_two_helm_charts&pretty=1"
+curl "localhost:8080/parse-all"        # one summary row per package, both kinds
 ```
