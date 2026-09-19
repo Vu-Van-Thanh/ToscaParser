@@ -30,7 +30,7 @@ re-deriving ETSI mapping rules from scratch each session.
   | `ExampleCorp_VendorTypeCnf_vnf_pkg` | vendor types two levels below the ETSI ones, so nothing can be matched by name |
   | `ExampleCorp_LcmCnf_vnf_pkg` | Vnflcm scripts and MCIOP deployment order, both read from places the type file cannot express |
 
-  Non-conformant packages live separately, in `src/test/resources/negative/` - one per broken SHALL,
+  Non-conformant packages live separately, in `testdata-negative/` - one per broken SHALL,
   with a README of their own.
 
 - `etsi-vnfd-parser-demo`, a separate repository, consumes the parser as a library and serves any of

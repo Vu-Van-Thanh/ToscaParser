@@ -12,7 +12,6 @@ import com.example.etsi.vnfd.validation.Severity;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
@@ -178,6 +177,6 @@ class FindingsTest {
     }
 
     private static Path negativePackage(String name) {
-        return Paths.get("src/test/resources/negative").resolve(name).toAbsolutePath();
+        return Fixtures.negativePackageDir(name);
     }
 }

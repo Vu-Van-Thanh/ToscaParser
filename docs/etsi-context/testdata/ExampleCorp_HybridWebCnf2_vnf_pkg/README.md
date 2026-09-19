@@ -63,5 +63,5 @@ tosca.nodes.nfv.Mciop shall be present". In a hybrid template `WebContainer` **i
 premise is false and the rule stays silent — even if the author forgets `cache_mciop` entirely.
 
 Only the per-VDU reading of IFA011 Note 10 catches that. The negative fixture
-`src/test/resources/negative/HybridWebCnf2_missing_mciop/` is this package with `cache_mciop`
+`docs/etsi-context/testdata-negative/HybridWebCnf2_missing_mciop/` is this package with `cache_mciop`
 deleted, and it exists to prove exactly that: one ERROR, rule C2.

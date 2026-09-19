@@ -10,6 +10,12 @@ TOSCA03 stay quiet and the intended rule is the only thing in the output.
 Each `Definitions/descriptor.yaml` opens with a comment stating the clause violated, why it matters
 and what the parse is expected to produce.
 
+**Only `HybridWebCnf2_missing_mciop` is asserted on by the test suite** (`FindingsTest`). The other
+eleven are checked by hand, through the `etsi-vnfd-parser-demo` project: `GET /parse-all` prints the
+rules each one raised. They live here rather than under `src/test/resources/` for that reason - and
+because each ships its own copy of the ETSI type definitions, which would otherwise be several
+megabytes re-copied into `target/` on every build.
+
 | Directory | Rule | Requirement broken |
 |---|---|---|
 | `neg_C1_no_workload` | C1 | IFA011 7.1.2.2 Note 6 — neither `osContainerDesc` nor `mciopId` has an element |
