@@ -45,7 +45,7 @@ public final class ServiceToscaTemplate {
         return descriptorTemplates;
     }
 
-    /** Types from the package plus the built-in ETSI catalogue. */
+    /** Every type the package declares or imports; nothing is supplied from outside it. */
     public TypeRegistry typeRegistry() {
         return typeRegistry;
     }

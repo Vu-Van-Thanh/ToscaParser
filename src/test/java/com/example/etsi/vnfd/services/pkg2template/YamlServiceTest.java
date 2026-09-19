@@ -49,7 +49,7 @@ class YamlServiceTest {
     }
 
     @Test
-    @DisplayName("a vendor VNF node type resolves to tosca.nodes.nfv.VNF through the bundled catalogue")
+    @DisplayName("a vendor VNF node type resolves to tosca.nodes.nfv.VNF through the imported types")
     void vendorVnfTypeResolves() {
         ServiceToscaTemplate tst = parse(Fixtures.SIMPLE_WEB_CNF);
         TypeReader.Hierarchy hierarchy = new TypeReader.Hierarchy(tst.typeRegistry());

@@ -62,10 +62,22 @@ import java.util.Optional;
  */
 public final class NodeBinder {
 
+    /**
+     * [PROJECT-SPECIFIC] Why an unresolvable type is reported rather than passed over.
+     *
+     * <p>SOL001 V5.4.1 Annex B.2 NOTE 2 lets a package reference the ETSI type definitions without
+     * shipping them, and clause 5.6.1 shows them imported by URL. This parser reads imports only
+     * from inside the package, so such a package resolves no ETSI type at all - and every node
+     * template would then be passed over one by one, leaving an empty VNFD that parsed "successfully".
+     */
+    private static final String CLAUSE_TYPE_RESOLUTION =
+            "[PROJECT-SPECIFIC] SOL001 V5.4.1 Annex B.2 NOTE 2";
+
     private final ObjectMapper mapper = ToscaBindModule.mapper();
     private final NodeTypeResolver resolver;
     private final TypeDefaults defaults;
     private final ConstraintChecker constraints;
+    private final Findings findings;
 
     /** Binds without reporting: the caller does not want the conformance findings. */
     public NodeBinder(TypeReader.Hierarchy hierarchy, List<Class<? extends NfvNode>> nodeClasses) {
@@ -77,6 +89,7 @@ public final class NodeBinder {
         this.resolver = new NodeTypeResolver(hierarchy, nodeClasses);
         this.defaults = new TypeDefaults(hierarchy);
         this.constraints = new ConstraintChecker(hierarchy, findings);
+        this.findings = findings;
     }
 
     /** Binds a node template, or returns empty when it is not a type this library maps. */
@@ -96,6 +109,11 @@ public final class NodeBinder {
     public Optional<NfvNode> bind(NodeTemplate template, Map<String, NodeTemplate> topology) {
         Optional<Class<? extends NfvNode>> target = resolver.resolve(template.type());
         if (!target.isPresent()) {
+            findings.error("TYPE01", CLAUSE_TYPE_RESOLUTION,
+                    "Node template " + template.name() + " declares type " + template.type()
+                            + ", which resolves to no ETSI node type - the template was dropped and "
+                            + "contributes nothing to the VNFD",
+                    template.source() == null ? null : template.source().toFindingRef());
             return Optional.empty();
         }
 

@@ -435,12 +435,11 @@ public final class PackageReader {
         }
 
         TypeReader types = new TypeReader();
-        TypeReader.addCatalogue(types);
 
         Map<String, ToscaDescriptorTemplate> templates = new LinkedHashMap<>();
         Set<String> visited = new LinkedHashSet<>();
         for (String file : candidateFiles) {
-            readFileAndImports(file, types, templates, visited, findings, 0);
+            readFileAndImports(file, file, types, templates, visited, findings, 0);
         }
 
         List<ToscaDescriptorTemplate> withTopology = new ArrayList<>();
@@ -455,13 +454,22 @@ public final class PackageReader {
     }
 
     /**
-     * Reads one file, registers its type definitions, then follows its imports.
+     * Reads one file, follows its imports, then registers its type definitions.
      *
-     * <p>A missing import is not an error. SOL001 V5.4.1 Annex B.2 NOTE 2 says the ETSI type
-     * definitions file "may, but need not, be included in the VNF Package", and packages routinely
-     * reference it without shipping it; the bundled catalogue supplies those types instead.
+     * <p>[PROJECT-SPECIFIC] An import that is not in the package is reported. SOL001 V5.4.1
+     * Annex B.2 NOTE 2 permits the ETSI type definitions file to be referenced without being
+     * shipped - its clause 5.6.1 examples reference it by URL - but this parser resolves imports
+     * only within the package, so a type it cannot read is a type it cannot apply. Reporting the
+     * gap is what keeps the consequence visible; see {@code TYPE01} for the second half of it.
+     *
+     * <p>Types are registered <em>after</em> the imports so that a definition in this file wins
+     * over one of the same name in a file it imports, which is the precedence TOSCA specifies and
+     * {@link TypeReader} documents.
+     *
+     * @param asWritten the reference exactly as the descriptor spelled it, for messages - the
+     *     resolved form of a URL import is a nonsense path and reads as a parser fault
      */
-    private void readFileAndImports(String file, TypeReader types,
+    private void readFileAndImports(String file, String asWritten, TypeReader types,
                                     Map<String, ToscaDescriptorTemplate> templates,
                                     Set<String> visited, Findings findings, int depth) {
         if (depth > MAX_IMPORT_DEPTH || !visited.add(file)) {
@@ -469,23 +477,22 @@ public final class PackageReader {
         }
         byte[] content = read(file).orElse(null);
         if (content == null) {
-            if (!TypeReader.isCatalogueFile(file)) {
-                findings.info("YAML01", CLAUSE_TYPES_FILE,
-                        "Imported file is not present in the package: " + file,
-                        com.example.etsi.vnfd.validation.SourceRef.ofFile(file));
-            }
+            findings.info("YAML01", CLAUSE_TYPES_FILE,
+                    "Imported file is not present in the package: " + asWritten,
+                    com.example.etsi.vnfd.validation.SourceRef.ofFile(file));
             return;
         }
 
         Map<String, Object> document = loadMapping(file, content);
-        types.add(document, file);
         ToscaDescriptorTemplate template = readTemplate(file, document);
         templates.put(file, template);
 
         for (String reference : template.imports()) {
-            readFileAndImports(resolve(file, reference), types, templates,
+            readFileAndImports(resolve(file, reference), reference, types, templates,
                     visited, findings, depth + 1);
         }
+
+        types.add(document, file);
     }
 
     /**

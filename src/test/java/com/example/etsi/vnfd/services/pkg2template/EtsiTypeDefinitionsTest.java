@@ -2,6 +2,7 @@ package com.example.etsi.vnfd.services.pkg2template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.etsi.vnfd.fixture.Fixtures;
 import com.example.etsi.vnfd.typedef.ArtifactTypeDef;
 import com.example.etsi.vnfd.typedef.EtsiTypes;
 import com.example.etsi.vnfd.typedef.GroupTypeDef;
@@ -15,22 +16,32 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class EtsiTypeCatalogueTest {
+/**
+ * Checks the ETSI type definitions as a package ships them.
+ *
+ * <p>Nothing is bundled with the library, so these types reach the registry the only way any type
+ * does: the descriptor imports {@code etsi_nfv_sol001_vnfd_types.yaml}, that file is in the
+ * package, and it imports {@code etsi_nfv_sol001_common_types.yaml} in turn. Reading them through
+ * a real package rather than off the classpath means this test fails if that chain ever breaks.
+ */
+class EtsiTypeDefinitionsTest {
 
     private static TypeRegistry registry;
 
     @BeforeAll
-    static void loadCatalogue() {
-        TypeReader builder = new TypeReader();
-        TypeReader.addCatalogue(builder);
-        registry = builder.build();
+    static void loadTypesFromPackage() {
+        registry = new PackageReader(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF))
+                .parse()
+                .typeRegistry();
     }
 
     @Test
-    @DisplayName("both bundled definition files are loaded, common types first")
+    @DisplayName("the import chain reaches both definition files")
     void loadsBothFiles() {
-        assertThat(TypeReader.documents().keySet())
-                .containsExactly("etsi_nfv_sol001_common_types.yaml", "etsi_nfv_sol001_vnfd_types.yaml");
+        // Cp lives in the common types file, VduCp in the VNFD types file. Requiring one of each
+        // proves the second hop of the chain happened, not just the first.
+        assertThat(registry.nodeType(EtsiTypes.CP)).isPresent();
+        assertThat(registry.nodeType(EtsiTypes.VDU_CP)).isPresent();
     }
 
     @Test

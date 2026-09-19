@@ -15,15 +15,9 @@ import com.example.etsi.vnfd.typedef.PropertyDef;
 import com.example.etsi.vnfd.typedef.RelationshipTypeDef;
 import com.example.etsi.vnfd.typedef.RequirementDefinition;
 import com.example.etsi.vnfd.typedef.TypeRegistry;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,11 +30,15 @@ import java.util.regex.PatternSyntaxException;
 /**
  * Reads TOSCA type definitions, and answers questions about them.
  *
- * <p>Two halves of one subject. Building the registry - from the package files and from the ETSI
- * catalogue shipped on the classpath - and then walking {@code derived_from} to work out what a
- * type effectively declares once inheritance is applied. Nothing downstream classifies a node by
- * comparing type names, because SOL001 V5.4.1 clause 6.11.2 requires a VNF node type to be
- * VNF-specific, so the walk is the only correct answer to "what kind of node is this".
+ * <p>Two halves of one subject. Building the registry from the files the package contains, and then
+ * walking {@code derived_from} to work out what a type effectively declares once inheritance is
+ * applied. Nothing downstream classifies a node by comparing type names, because SOL001 V5.4.1
+ * clause 6.11.2 requires a VNF node type to be VNF-specific, so the walk is the only correct answer
+ * to "what kind of node is this".
+ *
+ * <p>[PROJECT-SPECIFIC] Every type comes from the package. Nothing is bundled, so a package that
+ * references the ETSI type definitions without shipping them resolves none of them - see
+ * {@code PackageReader.readFileAndImports}.
  */
 public final class TypeReader {
 
@@ -50,10 +48,9 @@ public final class TypeReader {
 
     // Populates a {@link TypeRegistry} from the type sections of TOSCA documents.
     //
-    // <p>Documents are added in precedence order, lowest first: the built-in ETSI catalogue, then
-    // anything the package imports, then the package's own definitions. A later definition of the same
-    // type name replaces an earlier one, so a package that ships its own copy of the ETSI types is
-    // parsed according to that copy.
+    // <p>Documents are added in precedence order, lowest first: whatever a file imports, then the file
+    // itself. A later definition of the same type name replaces an earlier one, so a descriptor that
+    // redefines a type it imported is parsed according to its own definition.
 
 
     private final TypeRegistry registry = new TypeRegistry();
@@ -330,103 +327,6 @@ public final class TypeReader {
         }
         Map<String, Object> map = Yamls.map(value);
         return map.isEmpty() ? Yamls.string(value) : Yamls.string(map.get("type"));
-    }
-    // ============================================================================================
-    // THE BUILT-IN ETSI TYPE CATALOGUE
-    // ============================================================================================
-
-    // The official SOL001 V5.4.1 type definitions, bundled on the classpath.
-    //
-    // <p>Needed because SOL001 V5.4.1 Annex B.2 NOTE 2 states that the type definitions file "may, but
-    // need not, be included in the VNF Package". Packages routinely reference it without shipping it:
-    // all three bundled examples import {@code etsi_nfv_sol001_vnfd_types.yaml} and none contains it.
-    // Without a built-in copy, {@code tosca.nodes.nfv.VduCp} would have no resolvable parent and no
-    // connection point could be recognised.
-    //
-    // <p>The common types file is loaded first because the VNFD types file imports it, and because
-    // {@code tosca.nodes.nfv.Cp} - the parent of all five connection point types - lives there.
-
-
-    private static final String BASE = "/etsi/sol001/v5.4.1/";
-    private static final String COMMON_TYPES = "etsi_nfv_sol001_common_types.yaml";
-    private static final String VNFD_TYPES = "etsi_nfv_sol001_vnfd_types.yaml";
-
-    /** Loaded once: the files are a few hundred kilobytes and never change at runtime. */
-    private static volatile Map<String, Map<String, Object>> cachedDocuments;
-
-    /** File names of the bundled definitions, in the order they must be loaded. */
-    public static List<String> fileNames() {
-        return Arrays.asList(COMMON_TYPES, VNFD_TYPES);
-    }
-
-    /** The bundled documents, keyed by file name, in load order. */
-    public static Map<String, Map<String, Object>> documents() {
-        Map<String, Map<String, Object>> local = cachedDocuments;
-        if (local == null) {
-            synchronized (TypeReader.class) {
-                local = cachedDocuments;
-                if (local == null) {
-                    local = loadAll();
-                    cachedDocuments = local;
-                }
-            }
-        }
-        return local;
-    }
-
-    /** Registers the bundled definitions into a builder, lowest precedence first. */
-    public static void addCatalogue(TypeReader builder) {
-        for (Map.Entry<String, Map<String, Object>> e : documents().entrySet()) {
-            builder.add(e.getValue(), "built-in:" + e.getKey());
-        }
-    }
-
-    /** Whether a file name refers to one of the bundled ETSI definition files. */
-    public static boolean isCatalogueFile(String reference) {
-        if (reference == null) {
-            return false;
-        }
-        String leaf = reference.substring(reference.lastIndexOf('/') + 1);
-        return COMMON_TYPES.equals(leaf) || VNFD_TYPES.equals(leaf);
-    }
-
-    private static Map<String, Map<String, Object>> loadAll() {
-        Map<String, Map<String, Object>> documents = new LinkedHashMap<>();
-        for (String fileName : fileNames()) {
-            documents.put(fileName, load(fileName));
-        }
-        return Collections.unmodifiableMap(documents);
-    }
-
-    /**
-     * Loads one bundled file through the same path as a file from the package.
-     *
-     * <p>Shared deliberately. The catalogue used to build its own {@code Yaml} and omitted
-     * {@code allowDuplicateKeys(false)}, so a duplicate key in the ETSI type definitions would have
-     * been silently resolved to the last occurrence here while being rejected in a descriptor.
-     * One load path means one set of rules.
-     */
-    private static Map<String, Object> load(String fileName) {
-        String resource = BASE + fileName;
-        try (InputStream in = TypeReader.class.getResourceAsStream(resource)) {
-            if (in == null) {
-                throw new IllegalStateException(
-                        "Bundled ETSI type definitions are missing from the classpath: " + resource);
-            }
-            return PackageReader.loadMapping(resource, readAll(in));
-        } catch (IOException e) {
-            throw new UncheckedIOException("Cannot read " + resource, e);
-        }
-    }
-
-    private static byte[] readAll(InputStream in) throws IOException {
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        byte[] chunk = new byte[8192];
-        int read;
-        while ((read = in.read(chunk)) != -1) {
-            buffer.write(chunk, 0, read);
-        }
-        return buffer.toByteArray();
     }
     // ============================================================================================
     // WALKING derived_from

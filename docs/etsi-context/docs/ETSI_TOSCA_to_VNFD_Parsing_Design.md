@@ -163,10 +163,12 @@ uploaded; V5.4.1 doesn't exist yet per earlier discussion). Practical, conventio
 2. Load that YAML, follow its `imports:` list, merge `data_types` / `node_types` / `artifact_types`
    across all imported files that are physically present in the package.
 3. The official `etsi_nfv_sol001_vnfd_types.yaml` (SOL001 Annex B.2) defines the ETSI base types
-   (`tosca.nodes.nfv.VNF`, `Vdu.OsContainer`, `Mciop`, ...) but is often *referenced*, not *shipped*,
-   in a package (see both example packages' READMEs). A parser therefore needs a built-in fallback
-   catalogue of these base type names/clauses so `derived_from` chains can still be resolved to an
-   ETSI "kind" even when the external file isn't present in the CSAR being parsed.
+   (`tosca.nodes.nfv.VNF`, `Vdu.OsContainer`, `Mciop`, ...). `[PROJECT-SPECIFIC]` Annex B.2 NOTE 2
+   allows a package to reference it without shipping it, and clause 5.6.1 imports it by URL, but
+   this parser resolves imports only from inside the package. The file must therefore be present in
+   the CSAR. A package that omits it still binds its node templates - they name the ETSI types
+   literally - but every check those type definitions carry stops running, so the omission is
+   reported as `YAML01`.
 
 ### 2.2 Node-level mapping table (SOL001 → IFA011) — CNF rows only
 
@@ -236,9 +238,9 @@ are deliberately omitted per current scope):
 
 ### 2.5 Open questions / assumptions for the future library
 
-- `[ASSUMPTION]` The type registry's fallback catalogue (2.1.3) needs to be built once from SOL001
-  Annex B section + the clause tables already verified in this project's prior work, kept separate
-  from the CSAR-parsing logic so it can be updated if SOL001 changes.
+- `[PROJECT-SPECIFIC]` The type registry has no fallback catalogue (2.1.3): every type comes from
+  the package, so the SOL001 version a package is parsed against is whichever one it ships rather
+  than one the library pins.
 - `[ASSUMPTION]` Multi-flavour packages (more than one service template) are architecturally handled
   by looping section 2.3 per file — not yet tested against a real multi-DF package.
 - `CANNOT VERIFY FROM PROVIDED ETSI SOURCES`: exact SOL004 CSAR packaging/manifest rules. The parser

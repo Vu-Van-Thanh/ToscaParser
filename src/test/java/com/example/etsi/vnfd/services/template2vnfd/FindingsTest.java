@@ -9,12 +9,15 @@ import com.example.etsi.vnfd.model.LcmRealizationPath;
 import com.example.etsi.vnfd.model.Vdu;
 import com.example.etsi.vnfd.validation.Finding;
 import com.example.etsi.vnfd.validation.Severity;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * What a package is told about itself.
@@ -97,6 +100,81 @@ class FindingsTest {
         assertThat(vdus.stream().filter(v -> "WebVdu".equals(v.getVduId())).findFirst())
                 .hasValueSatisfying(v -> assertThat(v.getLcmRealizationPath())
                         .isEqualTo(LcmRealizationPath.DIRECT_MCIO_CISM));
+    }
+
+    /**
+     * [PROJECT-SPECIFIC] What omitting the ETSI type definitions actually costs.
+     *
+     * <p>Not the VNFD. A descriptor names the ETSI types literally, so every node template still
+     * binds and the VNFD comes out identical - which is exactly what makes this worth a test. What
+     * disappears is the validation those definitions carry: TOSCA03 is the {@code vnfm_info} pattern
+     * constraint, declared on {@code tosca.nodes.nfv.VNF} and on nothing the package itself writes.
+     * A consumer reading only the VNFD cannot tell the difference, so the finding has to say it.
+     */
+    @Test
+    @DisplayName("[PROJECT-SPECIFIC] omitting the ETSI type files silently drops type-borne checks")
+    void missingEtsiTypeFilesDropValidation(@TempDir Path temp) throws Exception {
+        Path pkg = temp.resolve(Fixtures.SIMPLE_WEB_CNF);
+        copyTree(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF), pkg);
+        Files.delete(pkg.resolve("Definitions/etsi_nfv_sol001_vnfd_types.yaml"));
+        Files.delete(pkg.resolve("Definitions/etsi_nfv_sol001_common_types.yaml"));
+
+        ParseResult without = parse(pkg);
+        ParseResult with = parseFixture(Fixtures.SIMPLE_WEB_CNF);
+
+        // The import went unsatisfied, and SOL001 V5.4.1 Annex B.2 NOTE 2 would have allowed that.
+        assertThat(ruleIds(without, Severity.INFO)).contains("YAML01");
+        assertThat(ruleIds(with, Severity.INFO)).doesNotContain("YAML01");
+
+        // The cost: a constraint that only the ETSI type definitions declare stops being applied.
+        assertThat(ruleIds(with, Severity.WARN)).contains("TOSCA03");
+        assertThat(ruleIds(without, Severity.WARN)).doesNotContain("TOSCA03");
+
+        // And the VNFD looks the same either way, which is why YAML01 is the only warning a
+        // consumer gets that the package was checked less thoroughly than it appears.
+        assertThat(without.getVnfd().getVdu()).hasSameSizeAs(with.getVnfd().getVdu());
+        assertThat(without.getVnfd().getVnfdId()).isEqualTo(with.getVnfd().getVnfdId());
+    }
+
+    @Test
+    @DisplayName("TYPE01: a node template whose type resolves to nothing is reported, not skipped")
+    void unresolvableNodeTypeIsReported(@TempDir Path temp) throws Exception {
+        Path pkg = temp.resolve(Fixtures.SIMPLE_WEB_CNF);
+        copyTree(Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF), pkg);
+
+        // A descriptor that names a type nothing declares - a typo, or a vendor type whose defining
+        // file was left out of the package. The node type itself stays declared, so only the node
+        // template breaks.
+        Path descriptor = pkg.resolve("Definitions/ExampleCorp_SimpleWebCnf_df_simple.yaml");
+        String text = new String(Files.readAllBytes(descriptor), StandardCharsets.UTF_8);
+        Files.write(descriptor, text.replace("      type: ExampleCorp.SimpleWebCnf.1_0",
+                "      type: ExampleCorp.Undeclared.1_0").getBytes(StandardCharsets.UTF_8));
+
+        ParseResult result = parse(pkg);
+
+        List<Finding> dropped = result.getFindings(Severity.ERROR).stream()
+                .filter(f -> "TYPE01".equals(f.ruleId()))
+                .collect(Collectors.toList());
+        assertThat(dropped).hasSize(1);
+        assertThat(dropped.get(0).message()).contains("ExampleCorp.Undeclared.1_0");
+
+        // Without TYPE01 this package would parse "successfully" and simply have no VNF header.
+        assertThat(result.hasErrors()).isTrue();
+        assertThat(result.getVnfd().getVnfdId()).isEmpty();
+    }
+
+    private static void copyTree(Path from, Path to) throws Exception {
+        try (java.util.stream.Stream<Path> tree = Files.walk(from)) {
+            for (Path source : tree.collect(Collectors.toList())) {
+                Path target = to.resolve(from.relativize(source).toString());
+                if (Files.isDirectory(source)) {
+                    Files.createDirectories(target);
+                } else {
+                    Files.createDirectories(target.getParent());
+                    Files.copy(source, target);
+                }
+            }
+        }
     }
 
     private static Path negativePackage(String name) {

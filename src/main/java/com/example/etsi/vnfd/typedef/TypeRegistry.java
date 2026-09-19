@@ -6,16 +6,15 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * All TOSCA types visible to one VNF package: those it declares, those it imports, and the built-in
- * ETSI catalogue.
+ * All TOSCA types visible to one VNF package: those it declares and those it imports.
  *
- * <p>The catalogue is not optional. SOL001 V5.4.1 Annex B.2 NOTE 2 says the type definitions file
- * "may, but need not, be included in the VNF Package", and in practice packages reference it
- * without shipping it - all three bundled examples do. Without a built-in copy the
- * {@code derived_from} chain of every ETSI type would dead-end and no node could be classified.
+ * <p>[PROJECT-SPECIFIC] Nothing else. SOL001 V5.4.1 Annex B.2 NOTE 2 permits a package to reference
+ * the ETSI type definitions file without shipping it, but this parser reads imports only from
+ * inside the package, so the definitions have to be there. A package that references them and does
+ * not ship them dead-ends the {@code derived_from} chain of every ETSI type and classifies nothing;
+ * that outcome is reported rather than left silent - see {@code YAML01} and {@code TYPE01}.
  *
- * <p>A type declared by the package wins over the catalogue entry of the same name, so a package
- * that ships its own copy of the ETSI definitions behaves as that copy says.
+ * <p>A type declared by a file wins over one of the same name in a file it imports.
  */
 public final class TypeRegistry {
 

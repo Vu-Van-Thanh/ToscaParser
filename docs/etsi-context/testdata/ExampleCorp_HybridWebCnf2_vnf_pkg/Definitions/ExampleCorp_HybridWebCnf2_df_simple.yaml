@@ -37,8 +37,13 @@ description: >-
   described in the VNFD itself.
 
 imports:
-  # [ETSI NORMATIVE] SOL001 V5.4.1 Annex B.2 NOTE 2: the type definitions file "may, but need not,
-  # be included in the VNF Package". It is referenced but not shipped; a consumer supplies it.
+  # [ETSI NORMATIVE] Obtained from the official ETSI location cited in SOL001 V5.4.1 Annex B.2 -
+  # do not hand-author it:
+  #   https://forge.etsi.org/rep/nfv/SOL001/raw/v5.4.1/etsi_nfv_sol001_vnfd_types.yaml
+  # [PROJECT-SPECIFIC] Annex B.2 NOTE 2 says the file "may, but need not, be included in the VNF
+  # Package", and clause 5.6.1 imports it by URL. This parser resolves imports only inside the
+  # package, so it is shipped here, as is etsi_nfv_sol001_common_types.yaml which it imports in
+  # turn (Annex B.2 NOTE 1).
   - etsi_nfv_sol001_vnfd_types.yaml
 
 node_types:

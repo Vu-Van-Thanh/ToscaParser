@@ -58,7 +58,7 @@ public abstract class AbstractTypeDef {
     }
 
     /**
-     * Where this type came from: a package file, or the built-in ETSI catalogue.
+     * Which file of the package declared this type.
      * Useful when a package redefines a standard type and the parse needs explaining.
      */
     public Optional<String> declaredIn() {

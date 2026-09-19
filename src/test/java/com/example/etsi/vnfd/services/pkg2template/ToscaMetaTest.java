@@ -70,15 +70,16 @@ class ToscaMetaTest {
     }
 
     @Test
-    @DisplayName("Other-Definitions may name a file the package does not ship")
-    void otherDefinitionsMayBeAbsentFromPackage() {
+    @DisplayName("the file Other-Definitions names is in the package and gets read")
+    void otherDefinitionsIsShippedAndRead() {
         ServiceToscaTemplate tst = new PackageReader(
                 Fixtures.packageDir(Fixtures.SIMPLE_WEB_CNF)).parse();
 
-        // SOL001 V5.4.1 Annex B.2 NOTE 2: the type definitions file "may, but need not, be
-        // included in the VNF Package". All three bundled packages reference it without shipping it.
+        // [PROJECT-SPECIFIC] SOL001 V5.4.1 Annex B.2 NOTE 2 allows the type definitions file to be
+        // referenced without being shipped, but this parser resolves imports only inside the
+        // package, so a package that leaves it out resolves no ETSI type at all.
         assertThat(tst.meta().otherDefinitions()).isNotEmpty();
         assertThat(tst.descriptorTemplates()).extracting(t -> t.file())
-                .doesNotContain(tst.meta().otherDefinitions().get(0));
+                .contains(tst.meta().otherDefinitions().get(0));
     }
 }
