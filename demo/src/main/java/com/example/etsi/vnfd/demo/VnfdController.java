@@ -50,7 +50,7 @@ public class VnfdController {
 
     /** Every bundled package, positives and negatives. */
     @GetMapping("/packages")
-    public ObjectNode packages() {
+    public ResponseEntity<String> packages(@RequestParam(required = false) String pretty) {
         ObjectNode n = VnfdJson.object();
         ArrayNode a = VnfdJson.array();
         for (PackageCatalog.Entry e : catalog.list()) {
@@ -62,31 +62,34 @@ public class VnfdController {
         }
         n.put("count", a.size());
         n.set("packages", a);
-        return n;
+        return body(HttpStatus.OK, n, pretty != null && !"0".equals(pretty));
     }
 
     /** The full answer: {@code { package, hasErrors, vnfd, findings }}. */
     @GetMapping("/parse")
-    public ResponseEntity<JsonNode> parse(
+    public ResponseEntity<String> parse(
             @RequestParam(required = false) String pkg,
-            @RequestParam(required = false) String dir) {
-        return respond(pkg, dir, ParseApi.Report::toJson);
+            @RequestParam(required = false) String dir,
+            @RequestParam(required = false) String pretty) {
+        return respond(pkg, dir, pretty, ParseApi.Report::toJson);
     }
 
     /** The VNFD alone, for diffing one run against another. */
     @GetMapping("/vnfd")
-    public ResponseEntity<JsonNode> vnfd(
+    public ResponseEntity<String> vnfd(
             @RequestParam(required = false) String pkg,
-            @RequestParam(required = false) String dir) {
-        return respond(pkg, dir, ParseApi.Report::vnfdJson);
+            @RequestParam(required = false) String dir,
+            @RequestParam(required = false) String pretty) {
+        return respond(pkg, dir, pretty, ParseApi.Report::vnfdJson);
     }
 
     /** Findings alone, each with the clause that justifies it. */
     @GetMapping("/findings")
-    public ResponseEntity<JsonNode> findings(
+    public ResponseEntity<String> findings(
             @RequestParam(required = false) String pkg,
-            @RequestParam(required = false) String dir) {
-        return respond(pkg, dir, ParseApi.Report::findingsJson);
+            @RequestParam(required = false) String dir,
+            @RequestParam(required = false) String pretty) {
+        return respond(pkg, dir, pretty, ParseApi.Report::findingsJson);
     }
 
     /**
@@ -97,15 +100,16 @@ public class VnfdController {
      * quietest way for a descriptor to lose content.
      */
     @GetMapping("/debug")
-    public ResponseEntity<JsonNode> debug(
+    public ResponseEntity<String> debug(
             @RequestParam(required = false) String pkg,
-            @RequestParam(required = false) String dir) {
-        return respond(pkg, dir, ParseApi.Report::debugJson);
+            @RequestParam(required = false) String dir,
+            @RequestParam(required = false) String pretty) {
+        return respond(pkg, dir, pretty, ParseApi.Report::debugJson);
     }
 
     /** One summary row per package, for comparing them side by side. */
     @GetMapping("/parse-all")
-    public ObjectNode parseAll() {
+    public ResponseEntity<String> parseAll(@RequestParam(required = false) String pretty) {
         ObjectNode n = VnfdJson.object();
         ArrayNode rows = VnfdJson.array();
         for (PackageCatalog.Entry e : catalog.list()) {
@@ -115,26 +119,41 @@ public class VnfdController {
         }
         n.put("count", rows.size());
         n.set("results", rows);
-        return n;
+        return body(HttpStatus.OK, n, pretty != null && !"0".equals(pretty));
     }
 
     // ------------------------------------------------------------------ plumbing
 
-    private ResponseEntity<JsonNode> respond(String pkg, String dir,
+    /**
+     * Resolves the package, calls the library, and writes the chosen view.
+     *
+     * <p>Serialised here rather than left to Spring's message converter so that {@code ?pretty=1}
+     * can indent it - a VNFD is deep enough that reading one as a single line is not a reasonable
+     * thing to ask of anybody holding a terminal.
+     */
+    private ResponseEntity<String> respond(String pkg, String dir, String pretty,
             java.util.function.Function<ParseApi.Report, ObjectNode> view) {
+        boolean indent = pretty != null && !"0".equals(pretty) && !"false".equals(pretty);
+
         Optional<Path> resolved = resolve(pkg, dir);
         if (!resolved.isPresent()) {
-            return ResponseEntity.badRequest().body(error(
-                    "Pass ?pkg=<name> for a bundled package or ?dir=<path> for any directory"));
+            return body(HttpStatus.BAD_REQUEST, error(
+                    "Pass ?pkg=<name> for a bundled package or ?dir=<path> for any directory"),
+                    indent);
         }
         if (!Files.isDirectory(resolved.get())) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(error("Not a directory: " + resolved.get()));
+            return body(HttpStatus.NOT_FOUND,
+                    error("Not a directory: " + resolved.get()), indent);
         }
         ParseApi.Report report = ParseApi.parse(resolved.get());
-        return ResponseEntity
-                .status(report.ok() ? HttpStatus.OK : HttpStatus.UNPROCESSABLE_ENTITY)
-                .body(view.apply(report));
+        return body(report.ok() ? HttpStatus.OK : HttpStatus.UNPROCESSABLE_ENTITY,
+                view.apply(report), indent);
+    }
+
+    private static ResponseEntity<String> body(HttpStatus status, JsonNode node, boolean pretty) {
+        return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(VnfdJson.write(node, pretty));
     }
 
     private Optional<Path> resolve(String pkg, String dir) {
