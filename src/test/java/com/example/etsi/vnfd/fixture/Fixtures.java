@@ -19,6 +19,9 @@ public final class Fixtures {
     public static final String REGULAR_CNF = "ExampleCorp_RegularCnf_vnf_pkg";
     public static final String HYBRID_WEB_CNF = "ExampleCorp_HybridWebCnf_vnf_pkg";
 
+    /** The only bundled package with more than one deployment flavour. */
+    public static final String MULTI_DF_CNF = "ExampleCorp_MultiDfCnf_vnf_pkg";
+
     private static final String CONFORMANT = "docs/etsi-context/testdata";
     private static final String NEGATIVE = "docs/etsi-context/testdata-negative";
 
