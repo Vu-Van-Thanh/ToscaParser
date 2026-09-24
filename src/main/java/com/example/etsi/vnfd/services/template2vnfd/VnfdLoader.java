@@ -2,18 +2,9 @@ package com.example.etsi.vnfd.services.template2vnfd;
 
 import com.example.etsi.vnfd.model.LifeCycleManagementScript;
 import com.example.etsi.vnfd.ParseResult;
-import com.example.etsi.vnfd.model.OsContainerDesc;
 import com.example.etsi.vnfd.model.SecurityGroupRule;
-import com.example.etsi.vnfd.model.SwImageDesc;
 import com.example.etsi.vnfd.model.Vdu;
-import com.example.etsi.vnfd.model.CertificateDesc;
-import com.example.etsi.vnfd.model.VduCpd;
-import com.example.etsi.vnfd.model.VnfExtCpd;
-import com.example.etsi.vnfd.model.VipCpd;
-import com.example.etsi.vnfd.model.VirtualCpd;
-import com.example.etsi.vnfd.model.VirtualStorageDesc;
 import com.example.etsi.vnfd.model.VnfPackageChangeInfo;
-import com.example.etsi.vnfd.model.VnfVirtualLinkDesc;
 import com.example.etsi.vnfd.model.Vnfd;
 import com.example.etsi.vnfd.model.ext.MciopArtifacts;
 import com.example.etsi.vnfd.model.ext.VnfdExtensions;
@@ -95,7 +86,7 @@ public final class VnfdLoader {
                 new DeploymentFlavourMapper(hierarchy, mapper);
 
         Vnfd.Builder builder = Vnfd.builder();
-        Merged merged = new Merged();
+        CrossFlavourElements merged = new CrossFlavourElements();
         Set<String> mciopIds = new LinkedHashSet<>();
         Map<String, MciopArtifacts> mciopArtifacts = new LinkedHashMap<>();
         Map<String, SecurityGroupRule> securityGroupRules = new LinkedHashMap<>();
@@ -132,16 +123,7 @@ public final class VnfdLoader {
                     packageChanges.putIfAbsent(c.getChangeId(), c));
         }
 
-        merged.vdus.values().forEach(builder::addVdu);
-        merged.containers.values().forEach(builder::addOsContainerDesc);
-        merged.images.values().forEach(builder::addSwImageDesc);
-        merged.vduCpds.values().forEach(builder::addVduCpd);
-        merged.extCpds.values().forEach(builder::addVnfExtCpd);
-        merged.links.values().forEach(builder::addIntVirtualLinkDesc);
-        merged.storages.values().forEach(builder::addVirtualStorageDesc);
-        merged.vipCpds.values().forEach(builder::addVipCpd);
-        merged.virtualCpds.values().forEach(builder::addVirtualCpd);
-        merged.certificates.values().forEach(builder::addCertificateDesc);
+        merged.drainInto(builder);
         securityGroupRules.values().forEach(builder::addSecurityGroupRule);
         packageChanges.values().forEach(builder::addVnfPackageChangeInfo);
         mciopIds.forEach(builder::addMciopId);
@@ -159,76 +141,57 @@ public final class VnfdLoader {
 
     /** Maps every node of one flavour into the shared pool, and returns that flavour's VDUs. */
     private List<Vdu> collectNodes(FlavourContext context,
-            SwImageMapper swImages, StorageMapper storages, Merged merged) {
+            SwImageMapper swImages, StorageMapper storages, CrossFlavourElements merged) {
 
         List<Vdu> flavourVdus = new ArrayList<>();
         for (VduOsContainerDeployableUnit vdu : context.vdus()) {
-            String id = VnfdUtils.vduId(vdu);
-            merged.vdus.putIfAbsent(id, VduMapper.map(vdu, context));
-            flavourVdus.add(merged.vdus.get(id));
+            flavourVdus.add(merged.addVdu(VnfdUtils.vduId(vdu), VduMapper.map(vdu, context)));
         }
         for (VduOsContainer container : context.containers().values()) {
             SpecRules.swImage(container, context);
-            merged.containers.putIfAbsent(VnfdUtils.osContainerDescId(container),
+            merged.addOsContainerDesc(VnfdUtils.osContainerDescId(container),
                     OsContainerMapper.map(container, context));
             context.artifactOfType(container, EtsiTypes.ARTIFACT_SW_IMAGE).ifPresent(image ->
-                    merged.images.putIfAbsent(VnfdUtils.swImageDescId(container),
+                    merged.addSwImageDesc(VnfdUtils.swImageDescId(container),
                             swImages.map(image, container)));
         }
         for (Cp cp : context.connectionPoints().values()) {
             if (cp instanceof VduCp) {
-                merged.vduCpds.putIfAbsent(VnfdUtils.cpdId(cp), CpMapper.mapVduCp((VduCp) cp));
+                merged.addVduCpd(VnfdUtils.cpdId(cp), CpMapper.mapVduCp((VduCp) cp));
             }
             // SOL001 clause 6.8.2.8: a VduCp exposed through substitution_mappings is also an
             // external CP, so one node template becomes two information elements.
             if (cp instanceof VnfExtCp) {
-                merged.extCpds.putIfAbsent(VnfdUtils.cpdId(cp), CpMapper.mapVnfExtCp((VnfExtCp) cp));
+                merged.addVnfExtCpd(VnfdUtils.cpdId(cp), CpMapper.mapVnfExtCp((VnfExtCp) cp));
             } else if (context.isExternallyExposed(cp.getKey())) {
-                merged.extCpds.putIfAbsent(VnfdUtils.cpdId(cp), CpMapper.mapExposedCp(cp));
+                merged.addVnfExtCpd(VnfdUtils.cpdId(cp), CpMapper.mapExposedCp(cp));
             }
         }
         for (VnfVirtualLink link : context.virtualLinks().values()) {
-            merged.links.putIfAbsent(VnfdUtils.virtualLinkDescId(link), VirtualLinkMapper.map(link));
+            merged.addIntVirtualLinkDesc(VnfdUtils.virtualLinkDescId(link), VirtualLinkMapper.map(link));
         }
         // SOL001 gives block, object and file storage three node types; IFA011 clause 7.1.9.4.2 has
         // one information element carrying a typeOfStorage, so the node type is what decides it.
         for (NfvNode node : context.nodes()) {
             storages.map(node).ifPresent(desc ->
-                    merged.storages.putIfAbsent(desc.getId(), desc));
+                    merged.addVirtualStorageDesc(desc.getId(), desc));
         }
         // Neither a VipCp nor a VirtualCp is a VduCp, so neither can go through the loop above:
         // they carry a `target` requirement where a VduCp carries `virtual_binding`.
         for (Cp cp : context.connectionPoints().values()) {
             if (cp instanceof VipCp) {
-                merged.vipCpds.putIfAbsent(VnfdUtils.cpdId(cp),
+                merged.addVipCpd(VnfdUtils.cpdId(cp),
                         SpecialCpMapper.mapVipCp((VipCp) cp));
             } else if (cp instanceof VirtualCp) {
-                merged.virtualCpds.putIfAbsent(VnfdUtils.cpdId(cp),
+                merged.addVirtualCpd(VnfdUtils.cpdId(cp),
                         SpecialCpMapper.mapVirtualCp((VirtualCp) cp));
             }
         }
         for (Certificate certificate : context.certificates()) {
-            merged.certificates.putIfAbsent(VnfdUtils.certificateDescId(certificate),
+            merged.addCertificateDesc(VnfdUtils.certificateDescId(certificate),
                     ModuleAndCertificateMapper.mapCertificate(certificate));
         }
         return flavourVdus;
-    }
-
-    /**
-     * The VNFD-level elements, keyed by identifier so two flavours describing the same VDU
-     * contribute it once. First declaration wins; order of first appearance is kept.
-     */
-    private static final class Merged {
-        final Map<String, Vdu> vdus = new LinkedHashMap<>();
-        final Map<String, OsContainerDesc> containers = new LinkedHashMap<>();
-        final Map<String, SwImageDesc> images = new LinkedHashMap<>();
-        final Map<String, VduCpd> vduCpds = new LinkedHashMap<>();
-        final Map<String, VnfExtCpd> extCpds = new LinkedHashMap<>();
-        final Map<String, VnfVirtualLinkDesc> links = new LinkedHashMap<>();
-        final Map<String, VirtualStorageDesc> storages = new LinkedHashMap<>();
-        final Map<String, VipCpd> vipCpds = new LinkedHashMap<>();
-        final Map<String, VirtualCpd> virtualCpds = new LinkedHashMap<>();
-        final Map<String, CertificateDesc> certificates = new LinkedHashMap<>();
     }
 }
 
