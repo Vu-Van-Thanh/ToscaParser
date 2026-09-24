@@ -279,7 +279,7 @@ final class OsContainerMapper {
     private OsContainerMapper() {
     }
 
-    static OsContainerDesc map(VduOsContainer node, ArtifactSelector artifacts) {
+    static OsContainerDesc map(VduOsContainer node, FlavourContext context) {
         OsContainerDesc.Builder builder = OsContainerDesc.builder(VnfdUtils.osContainerDescId(node));
 
         VduOsContainer.Properties p = node.getProperties();
@@ -296,7 +296,7 @@ final class OsContainerMapper {
 
         // IFA011 clause 7.1.6.13.2 makes swImageDesc M,1; SOL001 clause 6.8.12.6 requires the
         // artifact and caps it at one. The id is the node template name, not the artifact name.
-        if (artifacts.ofType(node, EtsiTypes.ARTIFACT_SW_IMAGE).isPresent()) {
+        if (context.artifactOfType(node, EtsiTypes.ARTIFACT_SW_IMAGE).isPresent()) {
             builder.swImageDesc(VnfdUtils.swImageDescId(node));
         }
 
@@ -468,17 +468,17 @@ final class MciopMapper {
     /** SOL001 clause 6.3.4.1 defines three ordered input parameters. */
     private static final int HELM_SCRIPT_ARITY = 3;
 
-    private final ArtifactSelector artifacts;
+    private final TypeReader.Hierarchy hierarchy;
     private final ObjectMapper mapper;
 
-    MciopMapper(ArtifactSelector artifacts, ObjectMapper mapper) {
-        this.artifacts = artifacts;
+    MciopMapper(TypeReader.Hierarchy hierarchy, ObjectMapper mapper) {
+        this.hierarchy = hierarchy;
         this.mapper = mapper;
     }
 
     /** The cardinality rules of clauses 6.8.14.6 and 6.8.14.7 - see {@link SpecRules#mciop}. */
-    void check(Mciop node, com.example.etsi.vnfd.validation.Findings findings) {
-        SpecRules.mciop(node, artifacts, findings);
+    void check(Mciop node, FlavourContext context) {
+        SpecRules.mciop(node, context);
     }
 
     MciopProfile mapProfile(Mciop node) {
@@ -499,10 +499,10 @@ final class MciopMapper {
                     .forEach(builder::addAssociatedVdu);
         }
 
-        artifacts.ofType(node, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_RULE)
+        VnfdUtils.artifactOfType(hierarchy, node, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_RULE)
                 .map(VnfdUtils::pathOf)
                 .ifPresent(builder::mciopParameterMappingRule);
-        artifacts.ofType(node, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_SCRIPT)
+        VnfdUtils.artifactOfType(hierarchy, node, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_SCRIPT)
                 .map(ArtifactDefinition::name)
                 .ifPresent(builder::lcmOpParameterMappingScriptId);
 
@@ -586,7 +586,7 @@ final class MciopMapper {
      * clause 6.3.4.1 rather than the four of IFA011 clause 7.1.20.1 - hence the recorded arity.
      */
     Optional<LcmOpParameterMappingScript> mapScript(Mciop node) {
-        return artifacts.ofType(node, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_SCRIPT).map(definition -> {
+        return VnfdUtils.artifactOfType(hierarchy, node, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_SCRIPT).map(definition -> {
             HelmParamMappingScript.Properties p = mapper.convertValue(
                     Collections.singletonMap("properties", definition.properties()),
                     HelmParamMappingScript.class).getProperties();
@@ -604,11 +604,11 @@ final class MciopMapper {
 
     /** The package-relative paths of the MCIOP artifacts - see the class javadoc for why. */
     Optional<MciopArtifacts> mapArtifacts(Mciop node) {
-        Optional<ArtifactDefinition> chart = artifacts.ofType(node, EtsiTypes.ARTIFACT_HELM_CHART);
+        Optional<ArtifactDefinition> chart = VnfdUtils.artifactOfType(hierarchy, node, EtsiTypes.ARTIFACT_HELM_CHART);
         Optional<ArtifactDefinition> script =
-                artifacts.ofType(node, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_SCRIPT);
+                VnfdUtils.artifactOfType(hierarchy, node, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_SCRIPT);
         Optional<ArtifactDefinition> rule =
-                artifacts.ofType(node, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_RULE);
+                VnfdUtils.artifactOfType(hierarchy, node, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_RULE);
         if (!chart.isPresent() && !script.isPresent() && !rule.isPresent()) {
             return Optional.empty();
         }
@@ -1061,9 +1061,9 @@ final class DeploymentFlavourMapper {
     private final PolicyMapper policies;
     private final MciopMapper mciops;
 
-    DeploymentFlavourMapper(TypeReader.Hierarchy hierarchy, ArtifactSelector artifacts, ObjectMapper mapper) {
+    DeploymentFlavourMapper(TypeReader.Hierarchy hierarchy, ObjectMapper mapper) {
         this.policies = new PolicyMapper(hierarchy, mapper);
-        this.mciops = new MciopMapper(artifacts, mapper);
+        this.mciops = new MciopMapper(hierarchy, mapper);
     }
 
     /** A mapped flavour plus the elements IFA011 keeps at VNFD level. */
@@ -1100,7 +1100,7 @@ final class DeploymentFlavourMapper {
         Map<String, Integer> deploymentOrder =
                 MciopMapper.deploymentOrder(context, context.findings());
         for (Mciop mciop : context.mciops()) {
-            mciops.check(mciop, context.findings());
+            mciops.check(mciop, context);
             builder.addMciopProfile(mciops.mapProfile(mciop, deploymentOrder));
         }
 

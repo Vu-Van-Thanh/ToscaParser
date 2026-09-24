@@ -70,9 +70,10 @@ final class SpecRules {
      * SOL001 V5.4.1 clause 6.8.12.6: a {@code Vdu.OsContainer} shall contain one artifact of type
      * {@code tosca.artifacts.nfv.SwImage}, and at most one.
      */
-    static void swImage(VduOsContainer container, ArtifactSelector artifacts, Findings findings) {
+    static void swImage(VduOsContainer container, FlavourContext context) {
+        Findings findings = context.findings();
         List<ArtifactDefinition> images =
-                artifacts.allOfType(container, EtsiTypes.ARTIFACT_SW_IMAGE);
+                context.artifactsOfType(container, EtsiTypes.ARTIFACT_SW_IMAGE);
         if (images.isEmpty()) {
             findings.error("C6", "SOL001 V5.4.1 cl. 6.8.12.6",
                     "Vdu.OsContainer " + container.getKey() + " declares no SwImage artifact",
@@ -90,7 +91,8 @@ final class SpecRules {
      * clause 6.8.14.7 caps each artifact type at one per {@code Mciop} while making
      * {@code HelmParamMappingRule} meaningful only alongside a {@code HelmParamMappingScript}.
      */
-    static void mciop(Mciop mciop, ArtifactSelector artifacts, Findings findings) {
+    static void mciop(Mciop mciop, FlavourContext context) {
+        Findings findings = context.findings();
         boolean associated = mciop.getRequirements() != null
                 && !VnfdUtils.orEmpty(mciop.getRequirements().getAssociatedVdu()).isEmpty();
         if (!associated) {
@@ -100,7 +102,7 @@ final class SpecRules {
                     ref(mciop));
         }
 
-        int charts = artifacts.allOfType(mciop, EtsiTypes.ARTIFACT_HELM_CHART).size();
+        int charts = context.artifactsOfType(mciop, EtsiTypes.ARTIFACT_HELM_CHART).size();
         if (charts > 1) {
             findings.error("C4", "SOL001 V5.4.1 cl. 6.8.14.7",
                     "Mciop " + mciop.getKey() + " declares " + charts + " HelmChart artifacts; at "
@@ -108,9 +110,9 @@ final class SpecRules {
                     ref(mciop));
         }
 
-        boolean rule = !artifacts.allOfType(mciop, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_RULE)
+        boolean rule = !context.artifactsOfType(mciop, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_RULE)
                 .isEmpty();
-        boolean script = !artifacts.allOfType(mciop, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_SCRIPT)
+        boolean script = !context.artifactsOfType(mciop, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_SCRIPT)
                 .isEmpty();
         if (rule && !script) {
             findings.error("C5", "SOL001 V5.4.1 cl. 6.8.14.7",

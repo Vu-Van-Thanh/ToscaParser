@@ -86,12 +86,11 @@ public final class VnfdLoader {
         }
 
         TypeReader.Hierarchy hierarchy = new TypeReader.Hierarchy(template.typeRegistry());
-        ArtifactSelector artifacts = new ArtifactSelector(hierarchy);
         NodeBinder binder = new NodeBinder(hierarchy, NodeTypes.ALL, findings);
         SwImageMapper swImages = new SwImageMapper(mapper);
         StorageMapper storages = new StorageMapper(mapper);
         DeploymentFlavourMapper flavourMapper =
-                new DeploymentFlavourMapper(hierarchy, artifacts, mapper);
+                new DeploymentFlavourMapper(hierarchy, mapper);
 
         Vnfd.Builder builder = Vnfd.builder();
         Merged merged = new Merged();
@@ -102,7 +101,7 @@ public final class VnfdLoader {
         boolean headerRead = false;
 
         for (ToscaDescriptorTemplate flavour : flavours) {
-            FlavourContext context = new FlavourContext(flavour, binder, findings);
+            FlavourContext context = new FlavourContext(flavour, binder, hierarchy, findings);
 
             Optional<Vnf> vnf = context.vnf();
             if (vnf.isPresent() && !headerRead) {
@@ -117,7 +116,7 @@ public final class VnfdLoader {
                 headerRead = true;
             }
 
-            List<Vdu> flavourVdus = collectNodes(context, artifacts, swImages, storages, merged);
+            List<Vdu> flavourVdus = collectNodes(context, swImages, storages, merged);
 
             DeploymentFlavourMapper.Result result = flavourMapper.map(context);
             SpecRules.flavour(result.df, flavourVdus, findings);
@@ -157,7 +156,7 @@ public final class VnfdLoader {
     }
 
     /** Maps every node of one flavour into the shared pool, and returns that flavour's VDUs. */
-    private List<Vdu> collectNodes(FlavourContext context, ArtifactSelector artifacts,
+    private List<Vdu> collectNodes(FlavourContext context,
             SwImageMapper swImages, StorageMapper storages, Merged merged) {
 
         List<Vdu> flavourVdus = new ArrayList<>();
@@ -167,10 +166,10 @@ public final class VnfdLoader {
             flavourVdus.add(merged.vdus.get(id));
         }
         for (VduOsContainer container : context.containers().values()) {
-            SpecRules.swImage(container, artifacts, context.findings());
+            SpecRules.swImage(container, context);
             merged.containers.putIfAbsent(VnfdUtils.osContainerDescId(container),
-                    OsContainerMapper.map(container, artifacts));
-            artifacts.ofType(container, EtsiTypes.ARTIFACT_SW_IMAGE).ifPresent(image ->
+                    OsContainerMapper.map(container, context));
+            context.artifactOfType(container, EtsiTypes.ARTIFACT_SW_IMAGE).ifPresent(image ->
                     merged.images.putIfAbsent(VnfdUtils.swImageDescId(container),
                             swImages.map(image, container)));
         }
@@ -244,6 +243,7 @@ final class FlavourContext {
     private final ToscaDescriptorTemplate template;
     private final TopologyTemplate topology;
     private final NodeBinder binder;
+    private final TypeReader.Hierarchy hierarchy;
     private final Findings findings;
 
     private final List<VduOsContainerDeployableUnit> vdus = new ArrayList<>();
@@ -260,9 +260,11 @@ final class FlavourContext {
     private final Map<String, List<String>> mciopsByVdu = new LinkedHashMap<>();
     private final Set<String> externallyExposedCps = new LinkedHashSet<>();
 
-    FlavourContext(ToscaDescriptorTemplate template, NodeBinder binder, Findings findings) {
+    FlavourContext(ToscaDescriptorTemplate template, NodeBinder binder,
+            TypeReader.Hierarchy hierarchy, Findings findings) {
         this.template = template;
         this.binder = binder;
+        this.hierarchy = hierarchy;
         this.findings = findings;
         this.topology = template.topologyTemplate().orElseThrow(() -> new VnfdParseException(
                 "Service template has no topology_template: " + template.file()));
@@ -330,6 +332,16 @@ final class FlavourContext {
     }
 
     /** Where the mappers report what the descriptor got wrong. */
+    /** Every artifact of that ETSI type on the node, matched through {@code derived_from}. */
+    List<ArtifactDefinition> artifactsOfType(NfvNode node, String etsiArtifactType) {
+        return VnfdUtils.artifactsOfType(hierarchy, node, etsiArtifactType);
+    }
+
+    /** The single artifact of that type; more than one is a rule violation, not a parse failure. */
+    Optional<ArtifactDefinition> artifactOfType(NfvNode node, String etsiArtifactType) {
+        return VnfdUtils.artifactOfType(hierarchy, node, etsiArtifactType);
+    }
+
     Findings findings() {
         return findings;
     }
@@ -417,51 +429,5 @@ final class FlavourContext {
 
     boolean isExternallyExposed(String cpKey) {
         return externallyExposedCps.contains(cpKey);
-    }
-}
-
-/**
- * Finds the artifacts of a node by ETSI type.
- *
- * <p>Artifacts cannot be looked up by name: the name of an artifact definition is the VNFD author's
- * choice - the bundled packages write {@code sw_image} and {@code web_helm_chart} - while SOL001
- * always speaks of the type. Clause 6.8.12.6 asks for "an artifact of type
- * tosca.artifacts.nfv.SwImage"; clause 6.8.14.7 caps each type on an {@code Mciop} at one.
- *
- * <p>Matching walks {@code derived_from} like everything else, so a vendor artifact type derived
- * from an ETSI one is still found.
- */
-final class ArtifactSelector {
-
-    private final TypeReader.Hierarchy hierarchy;
-
-    ArtifactSelector(TypeReader.Hierarchy hierarchy) {
-        this.hierarchy = hierarchy;
-    }
-
-    /** Every artifact of the given type, in declaration order. */
-    List<ArtifactDefinition> allOfType(NfvNode node, String etsiArtifactType) {
-        Map<String, ArtifactDefinition> declared = node.getArtifacts();
-        if (declared == null || declared.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<ArtifactDefinition> out = new ArrayList<>();
-        for (ArtifactDefinition artifact : declared.values()) {
-            if (hierarchy.isDerivedFrom(artifact.type(), etsiArtifactType)) {
-                out.add(artifact);
-            }
-        }
-        return out;
-    }
-
-    /**
-     * The single artifact of that type.
-     *
-     * <p>More than one is a rule violation, not a parse failure, so the first is returned and the
-     * caller checks {@link #allOfType} when it needs to report the cardinality.
-     */
-    Optional<ArtifactDefinition> ofType(NfvNode node, String etsiArtifactType) {
-        List<ArtifactDefinition> all = allOfType(node, etsiArtifactType);
-        return all.isEmpty() ? Optional.empty() : Optional.of(all.get(0));
     }
 }
