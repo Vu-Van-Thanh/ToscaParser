@@ -1,6 +1,5 @@
 package com.example.etsi.vnfd.services.template2vnfd;
 
-import com.example.etsi.vnfd.model.LcmRealizationPath;
 import com.example.etsi.vnfd.model.LifeCycleManagementScript;
 import com.example.etsi.vnfd.ParseResult;
 import com.example.etsi.vnfd.model.OsContainerDesc;
@@ -39,7 +38,6 @@ import com.example.etsi.vnfd.toscatype.node.VduOsContainerDeployableUnit;
 import com.example.etsi.vnfd.toscatype.node.Vnf;
 import com.example.etsi.vnfd.toscatype.node.VnfExtCp;
 import com.example.etsi.vnfd.toscatype.node.VnfVirtualLink;
-import com.example.etsi.vnfd.toscatype.policy.NfvPolicy;
 import com.example.etsi.vnfd.typedef.EtsiTypes;
 import com.example.etsi.vnfd.validation.Findings;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -164,32 +162,32 @@ public final class VnfdLoader {
 
         List<Vdu> flavourVdus = new ArrayList<>();
         for (VduOsContainerDeployableUnit vdu : context.vdus()) {
-            String id = IdRegistry.vduId(vdu);
+            String id = VnfdUtils.vduId(vdu);
             merged.vdus.putIfAbsent(id, VduMapper.map(vdu, context));
             flavourVdus.add(merged.vdus.get(id));
         }
         for (VduOsContainer container : context.containers().values()) {
             SpecRules.swImage(container, artifacts, context.findings());
-            merged.containers.putIfAbsent(IdRegistry.osContainerDescId(container),
+            merged.containers.putIfAbsent(VnfdUtils.osContainerDescId(container),
                     OsContainerMapper.map(container, artifacts));
             artifacts.ofType(container, EtsiTypes.ARTIFACT_SW_IMAGE).ifPresent(image ->
-                    merged.images.putIfAbsent(IdRegistry.swImageDescId(container),
+                    merged.images.putIfAbsent(VnfdUtils.swImageDescId(container),
                             swImages.map(image, container)));
         }
         for (Cp cp : context.connectionPoints().values()) {
             if (cp instanceof VduCp) {
-                merged.vduCpds.putIfAbsent(IdRegistry.cpdId(cp), CpMapper.mapVduCp((VduCp) cp));
+                merged.vduCpds.putIfAbsent(VnfdUtils.cpdId(cp), CpMapper.mapVduCp((VduCp) cp));
             }
             // SOL001 clause 6.8.2.8: a VduCp exposed through substitution_mappings is also an
             // external CP, so one node template becomes two information elements.
             if (cp instanceof VnfExtCp) {
-                merged.extCpds.putIfAbsent(IdRegistry.cpdId(cp), CpMapper.mapVnfExtCp((VnfExtCp) cp));
+                merged.extCpds.putIfAbsent(VnfdUtils.cpdId(cp), CpMapper.mapVnfExtCp((VnfExtCp) cp));
             } else if (context.isExternallyExposed(cp.getKey())) {
-                merged.extCpds.putIfAbsent(IdRegistry.cpdId(cp), CpMapper.mapExposedCp(cp));
+                merged.extCpds.putIfAbsent(VnfdUtils.cpdId(cp), CpMapper.mapExposedCp(cp));
             }
         }
         for (VnfVirtualLink link : context.virtualLinks().values()) {
-            merged.links.putIfAbsent(IdRegistry.virtualLinkDescId(link), VirtualLinkMapper.map(link));
+            merged.links.putIfAbsent(VnfdUtils.virtualLinkDescId(link), VirtualLinkMapper.map(link));
         }
         // SOL001 gives block, object and file storage three node types; IFA011 clause 7.1.9.4.2 has
         // one information element carrying a typeOfStorage, so the node type is what decides it.
@@ -201,15 +199,15 @@ public final class VnfdLoader {
         // they carry a `target` requirement where a VduCp carries `virtual_binding`.
         for (Cp cp : context.connectionPoints().values()) {
             if (cp instanceof VipCp) {
-                merged.vipCpds.putIfAbsent(IdRegistry.cpdId(cp),
+                merged.vipCpds.putIfAbsent(VnfdUtils.cpdId(cp),
                         SpecialCpMapper.mapVipCp((VipCp) cp));
             } else if (cp instanceof VirtualCp) {
-                merged.virtualCpds.putIfAbsent(IdRegistry.cpdId(cp),
+                merged.virtualCpds.putIfAbsent(VnfdUtils.cpdId(cp),
                         SpecialCpMapper.mapVirtualCp((VirtualCp) cp));
             }
         }
         for (Certificate certificate : context.certificates()) {
-            merged.certificates.putIfAbsent(IdRegistry.certificateDescId(certificate),
+            merged.certificates.putIfAbsent(VnfdUtils.certificateDescId(certificate),
                     ModuleAndCertificateMapper.mapCertificate(certificate));
         }
         return flavourVdus;
@@ -311,7 +309,7 @@ final class FlavourContext {
         // A connection point names its VDU, never the other way round (SOL001 clause 6.8.8).
         for (Cp cp : connectionPoints.values()) {
             if (cp instanceof VduCp) {
-                first(((VduCp) cp).getRequirements() == null
+                VnfdUtils.first(((VduCp) cp).getRequirements() == null
                         ? null : ((VduCp) cp).getRequirements().getVirtualBinding())
                         .ifPresent(vdu -> cpsByVdu
                                 .computeIfAbsent(vdu, key -> new ArrayList<>()).add(cp.getKey()));
@@ -322,7 +320,7 @@ final class FlavourContext {
             if (mciop.getRequirements() == null) {
                 continue;
             }
-            for (String vdu : orEmpty(mciop.getRequirements().getAssociatedVdu())) {
+            for (String vdu : VnfdUtils.orEmpty(mciop.getRequirements().getAssociatedVdu())) {
                 mciopsByVdu.computeIfAbsent(vdu, key -> new ArrayList<>()).add(mciop.getKey());
             }
         }
@@ -420,116 +418,6 @@ final class FlavourContext {
     boolean isExternallyExposed(String cpKey) {
         return externallyExposedCps.contains(cpKey);
     }
-
-    static Optional<String> first(List<String> values) {
-        return values == null || values.isEmpty() ? Optional.empty() : Optional.of(values.get(0));
-    }
-
-    static List<String> orEmpty(List<String> values) {
-        return values == null ? Collections.emptyList() : values;
-    }
-}
-
-/**
- * Every rule this library uses to derive an IFA011 identifier from a TOSCA declaration.
- *
- * <p>Gathered in one class on purpose. The rules are nearly all the same - "the node template name
- * is the id" - but only one of them is stated outright by the specification, and scattering them
- * across the mappers would make it impossible to see which is which.
- */
-final class IdRegistry {
-
-    private IdRegistry() {
-    }
-
-    /**
-     * [VERIFIED] SOL001 V5.4.1 clause 6.8.12.6: the node template name of a
-     * {@code Vdu.OsContainer} "fulfils the purpose of the 'id' attribute of the SwImageDesc
-     * information element and hence it will be used in APIs to identify the software image id from
-     * the VNFD perspective".
-     */
-    static String swImageDescId(NfvNode owningNode) {
-        return owningNode.getKey();
-    }
-
-    /** [ASSUMPTION] The node template name. SOL001 states the rule only for SwImageDesc. */
-    static String vduId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /** [ASSUMPTION] As above. */
-    static String osContainerDescId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /** [ASSUMPTION] As above. */
-    static String virtualStorageDescId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /** [ASSUMPTION] As above. */
-    static String cpdId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /**
-     * {@code CertificateDesc.id}, IFA011 clause 7.1.19.2.2 - M,1.
-     *
-     * <p>[ASSUMPTION] The node template name. SOL001 clause 6.8.19 does not say how the identifier
-     * is derived; the only place SOL001 states that rule outright is clause 6.8.12.6, for
-     * SwImageDesc.
-     */
-    static String certificateDescId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /**
-     * {@code DeployableModule.deployableModuleId}, IFA011 clause 7.1.8.24.2 - M,1.
-     *
-     * <p>[ASSUMPTION] The node template name, for the same reason as above. Note the identifier has
-     * to agree with whatever {@code VduProfile.deployableModule} names, since that is the reference
-     * IFA011 uses to attach a VDU to a module.
-     */
-    static String deployableModuleId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /** [ASSUMPTION] As above. */
-    static String virtualLinkDescId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /**
-     * [ASSUMPTION] The node template name.
-     *
-     * <p>IFA011 V5.4.1 clause 7.1.8.20.2 says {@code mciopId} "identifies the MCIOP in the VNF
-     * package" without saying how. The node template name is the only stable handle a descriptor
-     * offers, and SOL001 Table 6.1-1 NOTE 3 maps {@code associatedVdu} and {@code deploymentOrder}
-     * onto this node type, so the profile is built around it either way.
-     */
-    static String mciopId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /** [ASSUMPTION] The artifact definition name. */
-    static String lcmOpParameterMappingScriptId(ArtifactDefinition artifact) {
-        return artifact.name();
-    }
-
-    /**
-     * [ASSUMPTION] The policy name.
-     *
-     * <p>SOL001 Table 6.1-1 NOTE 3 states that {@code affinityOrAntiAffinityGroupId} maps to an
-     * {@code AffinityRule} or {@code AntiAffinityRule} policy, but not what the group id is.
-     */
-    static String affinityGroupId(NfvPolicy policy) {
-        return policy.getKey();
-    }
-
-    /** [ASSUMPTION] Interface plus operation, e.g. {@code Vnflcm.instantiate_start}. */
-    static String lcmScriptId(String interfaceName, String operationName) {
-        return interfaceName + "." + operationName;
-    }
 }
 
 /**
@@ -575,52 +463,5 @@ final class ArtifactSelector {
     Optional<ArtifactDefinition> ofType(NfvNode node, String etsiArtifactType) {
         List<ArtifactDefinition> all = allOfType(node, etsiArtifactType);
         return all.isEmpty() ? Optional.empty() : Optional.of(all.get(0));
-    }
-
-    /** The package-root-relative path of an artifact, falling back to the reference as written. */
-    static String pathOf(ArtifactDefinition artifact) {
-        return artifact.resolvedFile().orElse(artifact.file());
-    }
-}
-
-/**
- * Which CISM interface a VDU will be managed through.
- *
- * <p>[MANO INTERPRETATION] No attribute of IFA011 says "this VDU uses Helm". The conclusion follows
- * from two normative statements read together: IFA011 V5.4.1 clause 7.1.6.2.2 Note 10 - "In case
- * the VDU to be deployed is realized as OS containers and osContainerDesc is not present, the
- * MciopProfile associated with the VDU shall be present" - and SOL018 V5.4.1 clause 6.2.1.1, which
- * says the CISM exposes "management service interfaces on different abstraction levels. One
- * abstraction level are the MCIOPs, the other abstraction level are the MCIOs".
- *
- * <p>Worth deriving because the two paths differ in practice: through an MCIOP the VNFM runs the
- * parameter mapping script and then operates on a whole Helm release (SOL018 clause 7), while a VDU
- * described by an OsContainer is realized MCIO by MCIO through the Kubernetes API (clause 8), with
- * no equivalent of a rollback.
- *
- * <p>Note 10 is stated per VDU, and nothing requires the VDUs of one flavour to agree - so one
- * flavour may legitimately hold both kinds.
- */
-final class LcmRealizationResolver {
-
-    private LcmRealizationResolver() {
-    }
-
-    static LcmRealizationPath resolve(VduOsContainerDeployableUnit vdu,
-            List<String> associatedMciops) {
-        if (!associatedMciops.isEmpty()) {
-            return LcmRealizationPath.MCIOP_CISM;
-        }
-        if (!containerTargets(vdu).isEmpty()) {
-            return LcmRealizationPath.DIRECT_MCIO_CISM;
-        }
-        // Neither, which SpecRules reports as C2; the path itself is simply not derivable.
-        return LcmRealizationPath.UNDETERMINED;
-    }
-
-    static List<String> containerTargets(VduOsContainerDeployableUnit vdu) {
-        return vdu.getRequirements() == null
-                ? java.util.Collections.emptyList()
-                : FlavourContext.orEmpty(vdu.getRequirements().getContainer());
     }
 }

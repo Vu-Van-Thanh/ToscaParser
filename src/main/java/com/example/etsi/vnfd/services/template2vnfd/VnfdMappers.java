@@ -165,8 +165,8 @@ final class VnfHeaderMapper {
         literal(p.getExtInvariantId(), builder::vnfdExtInvariantId);
         literal(p.getDefaultLocalizationLanguage(), builder::defaultLocalizationLanguage);
 
-        FlavourContext.orEmpty(p.getVnfmInfo()).forEach(builder::addVnfmInfo);
-        FlavourContext.orEmpty(p.getLocalizationLanguages())
+        VnfdUtils.orEmpty(p.getVnfmInfo()).forEach(builder::addVnfmInfo);
+        VnfdUtils.orEmpty(p.getLocalizationLanguages())
                 .forEach(builder::addLocalizationLanguage);
     }
 
@@ -191,7 +191,7 @@ final class VduMapper {
     }
 
     static Vdu map(VduOsContainerDeployableUnit node, FlavourContext context) {
-        Vdu.Builder builder = Vdu.builder(IdRegistry.vduId(node));
+        Vdu.Builder builder = Vdu.builder(VnfdUtils.vduId(node));
 
         VduOsContainerDeployableUnit.Properties p = node.getProperties();
         if (p != null) {
@@ -199,16 +199,16 @@ final class VduMapper {
                    .description(p.getDescription())
                    .mcioIdentificationData(p.getMcioIdentificationData())
                    .isNumOfInstancesClusterBased(p.getIsNumOfInstancesClusterBased());
-            FlavourContext.orEmpty(p.getMcioConstraintParams()).forEach(builder::addMcioConstraintParam);
+            VnfdUtils.orEmpty(p.getMcioConstraintParams()).forEach(builder::addMcioConstraintParam);
         }
 
         VduOsContainerDeployableUnit.Requirements r = node.getRequirements();
         if (r != null) {
             // 'container' has occurrences [0, UNBOUNDED] (Table 6.8.13.4-1): a VDU may describe
             // several OS containers, as Annex A.18 vdu_2 does.
-            FlavourContext.orEmpty(r.getContainer()).forEach(builder::addOsContainerDesc);
-            FlavourContext.orEmpty(r.getVirtualStorage()).forEach(builder::addVirtualStorageDesc);
-            FlavourContext.orEmpty(r.getInstallableCertificate()).forEach(builder::addCertificateDesc);
+            VnfdUtils.orEmpty(r.getContainer()).forEach(builder::addOsContainerDesc);
+            VnfdUtils.orEmpty(r.getVirtualStorage()).forEach(builder::addVirtualStorageDesc);
+            VnfdUtils.orEmpty(r.getInstallableCertificate()).forEach(builder::addCertificateDesc);
         }
 
         // Declared on the connection points, collected here: IFA011 clause 7.1.6.2.2 intCpd.
@@ -217,7 +217,7 @@ final class VduMapper {
         trunkPorts(node, context).forEach(builder::addTrunkPort);
 
         LcmRealizationPath path =
-                LcmRealizationResolver.resolve(node, context.mciopsAssociatedTo(node.getKey()));
+                VnfdUtils.lcmRealizationPath(node, context.mciopsAssociatedTo(node.getKey()));
         builder.lcmRealizationPath(path);
 
         SpecRules.mciopCoverage(node, path, context.findings());
@@ -249,13 +249,13 @@ final class VduMapper {
             VduSubCp sub = (VduSubCp) cp;
             String parent = sub.getRequirements() == null
                     ? null
-                    : FlavourContext.first(sub.getRequirements().getTrunkBinding()).orElse(null);
+                    : VnfdUtils.first(sub.getRequirements().getTrunkBinding()).orElse(null);
             if (parent == null) {
                 continue;
             }
             VduSubCp.Properties p = sub.getProperties();
             byParent.computeIfAbsent(parent, k -> new ArrayList<>())
-                    .add(Subport.of(IdRegistry.cpdId(sub),
+                    .add(Subport.of(VnfdUtils.cpdId(sub),
                             p == null ? null : p.getSegmentationType(),
                             p == null ? null : p.getSegmentationId()));
         }
@@ -280,7 +280,7 @@ final class OsContainerMapper {
     }
 
     static OsContainerDesc map(VduOsContainer node, ArtifactSelector artifacts) {
-        OsContainerDesc.Builder builder = OsContainerDesc.builder(IdRegistry.osContainerDescId(node));
+        OsContainerDesc.Builder builder = OsContainerDesc.builder(VnfdUtils.osContainerDescId(node));
 
         VduOsContainer.Properties p = node.getProperties();
         if (p != null) {
@@ -297,7 +297,7 @@ final class OsContainerMapper {
         // IFA011 clause 7.1.6.13.2 makes swImageDesc M,1; SOL001 clause 6.8.12.6 requires the
         // artifact and caps it at one. The id is the node template name, not the artifact name.
         if (artifacts.ofType(node, EtsiTypes.ARTIFACT_SW_IMAGE).isPresent()) {
-            builder.swImageDesc(IdRegistry.swImageDescId(node));
+            builder.swImageDesc(VnfdUtils.swImageDescId(node));
         }
 
         return builder.build();
@@ -326,7 +326,7 @@ final class SwImageMapper {
                 java.util.Collections.singletonMap("properties", definition.properties()),
                 SwImage.class).getProperties();
 
-        SwImageDesc.Builder builder = SwImageDesc.builder(IdRegistry.swImageDescId(owner));
+        SwImageDesc.Builder builder = SwImageDesc.builder(VnfdUtils.swImageDescId(owner));
         if (p != null) {
             builder.name(p.getName())
                    .version(p.getVersion())
@@ -342,7 +342,7 @@ final class SwImageMapper {
         return builder
                 // IFA011 clause 7.1.6.5.2 swImage is "a reference to the actual software image";
                 // the resolved form is what a consumer can act on.
-                .swImage(ArtifactSelector.pathOf(definition))
+                .swImage(VnfdUtils.pathOf(definition))
                 .build();
     }
 }
@@ -363,12 +363,12 @@ final class CpMapper {
 
     /** SOL001 clause 6.8.8 VduCp (and clause 6.8.11 VduSubCp) to VduCpd. */
     static VduCpd mapVduCp(VduCp node) {
-        VduCpd.Builder builder = VduCpd.builder(IdRegistry.cpdId(node));
+        VduCpd.Builder builder = VduCpd.builder(VnfdUtils.cpdId(node));
         applyCommon(node, builder);
         if (node.getRequirements() != null) {
-            FlavourContext.first(node.getRequirements().getVirtualBinding())
+            VnfdUtils.first(node.getRequirements().getVirtualBinding())
                     .ifPresent(builder::vduId);
-            FlavourContext.first(node.getRequirements().getVirtualLink())
+            VnfdUtils.first(node.getRequirements().getVirtualLink())
                     .ifPresent(builder::intVirtualLinkDesc);
         }
         return builder.build();
@@ -376,12 +376,12 @@ final class CpMapper {
 
     /** SOL001 clause 6.8.2 VnfExtCp, declared explicitly, to VnfExtCpd. */
     static VnfExtCpd mapVnfExtCp(VnfExtCp node) {
-        VnfExtCpd.Builder builder = VnfExtCpd.builder(IdRegistry.cpdId(node));
+        VnfExtCpd.Builder builder = VnfExtCpd.builder(VnfdUtils.cpdId(node));
         applyCommon(node, builder);
         if (node.getRequirements() != null) {
             // SOL001 Table 6.8.2.4-1 names them internal_virtual_link and external_virtual_link;
             // the internal one is what IFA011 calls intVirtualLinkDesc.
-            FlavourContext.first(node.getRequirements().getInternalVirtualLink())
+            VnfdUtils.first(node.getRequirements().getInternalVirtualLink())
                     .ifPresent(builder::intVirtualLinkDesc);
         }
         builder.exposedThroughSubstitution(false);
@@ -394,12 +394,12 @@ final class CpMapper {
      * external one stands for, which is what lets a consumer follow it down to its VDU.
      */
     static VnfExtCpd mapExposedCp(Cp node) {
-        VnfExtCpd.Builder builder = VnfExtCpd.builder(IdRegistry.cpdId(node));
+        VnfExtCpd.Builder builder = VnfExtCpd.builder(VnfdUtils.cpdId(node));
         applyCommon(node, builder);
-        builder.intCpd(IdRegistry.cpdId(node));
+        builder.intCpd(VnfdUtils.cpdId(node));
         builder.exposedThroughSubstitution(true);
         if (node instanceof VduCp && ((VduCp) node).getRequirements() != null) {
-            FlavourContext.first(((VduCp) node).getRequirements().getVirtualLink())
+            VnfdUtils.first(((VduCp) node).getRequirements().getVirtualLink())
                     .ifPresent(builder::intVirtualLinkDesc);
         }
         return builder.build();
@@ -411,7 +411,7 @@ final class CpMapper {
         if (p == null) {
             return;
         }
-        FlavourContext.orEmpty(p.getLayerProtocols()).forEach(builder::addLayerProtocol);
+        VnfdUtils.orEmpty(p.getLayerProtocols()).forEach(builder::addLayerProtocol);
         builder.cpRole(p.getRole());
         builder.description(p.getDescription());
         builder.trunkMode(p.getTrunkMode());
@@ -438,7 +438,7 @@ final class VirtualLinkMapper {
 
     static VnfVirtualLinkDesc map(VnfVirtualLink node) {
         VnfVirtualLinkDesc.Builder builder =
-                VnfVirtualLinkDesc.builder(IdRegistry.virtualLinkDescId(node));
+                VnfVirtualLinkDesc.builder(VnfdUtils.virtualLinkDescId(node));
         VnfVirtualLink.Properties p = node.getProperties();
         if (p != null) {
             builder.description(p.getDescription());
@@ -486,7 +486,7 @@ final class MciopMapper {
     }
 
     MciopProfile mapProfile(Mciop node, Map<String, Integer> deploymentOrder) {
-        MciopProfile.Builder builder = MciopProfile.builder(IdRegistry.mciopId(node));
+        MciopProfile.Builder builder = MciopProfile.builder(VnfdUtils.mciopId(node));
         Integer order = deploymentOrder.get(node.getKey());
         if (order != null) {
             builder.deploymentOrder(order);
@@ -495,12 +495,12 @@ final class MciopMapper {
         // Table 6.8.14.4-1 gives associatedVdu occurrences [1, UNBOUNDED]; Annex A.23 declares the
         // key twice on one Mciop, which is why the bound field is a list.
         if (node.getRequirements() != null) {
-            FlavourContext.orEmpty(node.getRequirements().getAssociatedVdu())
+            VnfdUtils.orEmpty(node.getRequirements().getAssociatedVdu())
                     .forEach(builder::addAssociatedVdu);
         }
 
         artifacts.ofType(node, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_RULE)
-                .map(ArtifactSelector::pathOf)
+                .map(VnfdUtils::pathOf)
                 .ifPresent(builder::mciopParameterMappingRule);
         artifacts.ofType(node, EtsiTypes.ARTIFACT_HELM_PARAM_MAPPING_SCRIPT)
                 .map(ArtifactDefinition::name)
@@ -594,8 +594,8 @@ final class MciopMapper {
                     ? null
                     : p.getLanguage().resolved().orElse(null);
             return LcmOpParameterMappingScript.of(
-                    IdRegistry.lcmOpParameterMappingScriptId(definition),
-                    ArtifactSelector.pathOf(definition),
+                    VnfdUtils.lcmOpParameterMappingScriptId(definition),
+                    VnfdUtils.pathOf(definition),
                     language,
                     LcmOpParameterMappingScript.ScriptKind.HELM_PARAM_MAPPING,
                     HELM_SCRIPT_ARITY);
@@ -612,19 +612,19 @@ final class MciopMapper {
         if (!chart.isPresent() && !script.isPresent() && !rule.isPresent()) {
             return Optional.empty();
         }
-        MciopArtifacts.Builder builder = MciopArtifacts.builder(IdRegistry.mciopId(node));
-        chart.ifPresent(c -> builder.packagePath(ArtifactSelector.pathOf(c))
+        MciopArtifacts.Builder builder = MciopArtifacts.builder(VnfdUtils.mciopId(node));
+        chart.ifPresent(c -> builder.packagePath(VnfdUtils.pathOf(c))
                 .packageArtifactName(c.name())
                 .packageArtifactType(c.type()));
-        script.ifPresent(s -> builder.paramMappingScriptPath(ArtifactSelector.pathOf(s)));
-        rule.ifPresent(r -> builder.paramMappingRulePath(ArtifactSelector.pathOf(r)));
+        script.ifPresent(s -> builder.paramMappingScriptPath(VnfdUtils.pathOf(s)));
+        rule.ifPresent(r -> builder.paramMappingRulePath(VnfdUtils.pathOf(r)));
         return Optional.of(builder.build());
     }
 
     /** Every MCIOP id of the flavour, in declaration order. */
     static List<String> idsOf(List<Mciop> mciops) {
         List<String> ids = new java.util.ArrayList<>();
-        mciops.forEach(m -> ids.add(IdRegistry.mciopId(m)));
+        mciops.forEach(m -> ids.add(VnfdUtils.mciopId(m)));
         return ids;
     }
 }
@@ -702,7 +702,7 @@ final class PolicyMapper {
                 }
                 Integer count = vduLevel.getNumberOfInstances().resolved().orElse(null);
                 if (count != null) {
-                    for (String vduId : FlavourContext.orEmpty(definition.targets())) {
+                    for (String vduId : VnfdUtils.orEmpty(definition.targets())) {
                         b.addVduLevel(VduLevel.of(vduId, count));
                     }
                 }
@@ -783,7 +783,7 @@ final class PolicyMapper {
                 }
                 ScalingDelta.Builder b =
                         deltas.computeIfAbsent(deltaId, ScalingDelta::builder);
-                for (String vduId : FlavourContext.orEmpty(definition.targets())) {
+                for (String vduId : VnfdUtils.orEmpty(definition.targets())) {
                     b.addVduDelta(VduLevel.of(vduId, count));
                 }
             });
@@ -825,7 +825,7 @@ final class PolicyMapper {
             if (count == null) {
                 continue;
             }
-            for (String vduId : FlavourContext.orEmpty(definition.targets())) {
+            for (String vduId : VnfdUtils.orEmpty(definition.targets())) {
                 builder.addVduDelta(VduLevel.of(vduId, count));
                 any = true;
             }
@@ -857,7 +857,7 @@ final class PolicyMapper {
                 // The SOL001 level wraps the requirements in a bitrate_requirements field; IFA011
                 // clause 7.1.10.5.2 has VirtualLinkBitRateLevel carry them directly, so unwrap.
                 Map<String, Object> bitrate = VnfdMappers.plainMap(level.getBitrateRequirements());
-                for (String vlId : FlavourContext.orEmpty(definition.targets())) {
+                for (String vlId : VnfdUtils.orEmpty(definition.targets())) {
                     b.addVirtualLinkBitRateLevel(VirtualLinkBitRateLevel.of(vlId, bitrate));
                 }
             });
@@ -888,7 +888,7 @@ final class PolicyMapper {
                        .portRangeMin(p.getPortRangeMin())
                        .portRangeMax(p.getPortRangeMax());
             }
-            FlavourContext.orEmpty(definition.targets()).forEach(builder::addTarget);
+            VnfdUtils.orEmpty(definition.targets()).forEach(builder::addTarget);
             out.add(builder.build());
         }
         return out;
@@ -940,7 +940,7 @@ final class PolicyMapper {
                     }
                     // IFA011 clause 7.1.8.8.2 stepDeltas: the scaling deltas applied for the
                     // successive scaling steps of this aspect, in order.
-                    FlavourContext.orEmpty(aspect.getStepDeltas()).forEach(b::addStepDelta);
+                    VnfdUtils.orEmpty(aspect.getStepDeltas()).forEach(b::addStepDelta);
                 }
                 out.add(b.build());
             });
@@ -970,7 +970,7 @@ final class PolicyMapper {
             }
             // Both types declare the same properties, so one class reads either.
             AffinityRule policy = bind(definition, AffinityRule.class);
-            String groupId = definition.name();
+            String groupId = VnfdUtils.affinityGroupId(definition);
             String scope = policy.getProperties() == null
                     ? null
                     : resolved(policy.getProperties().getScope()).orElse(null);
@@ -989,7 +989,7 @@ final class PolicyMapper {
     /** Replaces every PlacementGroup target by its members - SOL001 clause 6.9.1. */
     private List<String> expand(List<String> targets, FlavourContext context) {
         List<String> out = new ArrayList<>();
-        for (String target : FlavourContext.orEmpty(targets)) {
+        for (String target : VnfdUtils.orEmpty(targets)) {
             GroupDefinition group = context.topology().groups().get(target);
             if (group != null && hierarchy.isDerivedFrom(group.type(), PLACEMENT_GROUP)) {
                 out.addAll(group.members());
@@ -1141,7 +1141,7 @@ final class DeploymentFlavourMapper {
         result.securityGroupRules.addAll(policies.securityGroupRules(context));
         result.packageChanges.addAll(policies.packageChanges(context));
         for (Mciop mciop : context.mciops()) {
-            result.mciopIds.add(IdRegistry.mciopId(mciop));
+            result.mciopIds.add(VnfdUtils.mciopId(mciop));
             mciops.mapScript(mciop).ifPresent(result.scripts::add);
             mciops.mapArtifacts(mciop).ifPresent(result.mciopArtifacts::add);
         }
@@ -1236,7 +1236,7 @@ final class DeploymentFlavourMapper {
     private VirtualLinkProfile virtualLinkProfile(VnfVirtualLink link,
             PolicyMapper.AffinityAssignment affinity) {
         VirtualLinkProfile.Builder builder =
-                VirtualLinkProfile.builder(IdRegistry.virtualLinkDescId(link));
+                VirtualLinkProfile.builder(VnfdUtils.virtualLinkDescId(link));
         if (link.getProperties() != null && link.getProperties().getVlProfile() != null) {
             com.example.etsi.vnfd.toscatype.data.VlProfile p = link.getProperties().getVlProfile();
             builder.maxBitrateRequirements(asMap(p.getMaxBitrateRequirements()))
@@ -1268,12 +1268,12 @@ final class DeploymentFlavourMapper {
     /** SOL001 Table 6.8.13.2-1 {@code vdu_profile} to IFA011 clause 7.1.8.3 {@code VduProfile}. */
     private VduProfile vduProfile(VduOsContainerDeployableUnit vdu,
             PolicyMapper.AffinityAssignment affinity) {
-        VduProfile.Builder builder = VduProfile.builder(IdRegistry.vduId(vdu));
+        VduProfile.Builder builder = VduProfile.builder(VnfdUtils.vduId(vdu));
         if (vdu.getProperties() != null && vdu.getProperties().getVduProfile() != null) {
             com.example.etsi.vnfd.toscatype.data.VduProfile p = vdu.getProperties().getVduProfile();
             builder.minNumberOfInstances(p.getMinNumberOfInstances())
                    .maxNumberOfInstances(p.getMaxNumberOfInstances());
-            FlavourContext.orEmpty(p.getModifyCapacityAttributesOp())
+            VnfdUtils.orEmpty(p.getModifyCapacityAttributesOp())
                     .forEach(builder::addModifyCapacityAttributesOp);
         }
         affinity.groupsOf(vdu.getKey()).forEach(builder::addAffinityGroup);
@@ -1327,7 +1327,7 @@ final class StorageMapper {
     private VirtualStorageDesc build(NfvNode node, TypeOfStorage type,
             Object storageData, PropertyValue<Boolean> perVnfcInstance, Object maintenance) {
         VirtualStorageDesc.Builder builder =
-                VirtualStorageDesc.builder(IdRegistry.virtualStorageDescId(node), type);
+                VirtualStorageDesc.builder(VnfdUtils.virtualStorageDescId(node), type);
         if (storageData != null) {
             builder.storageData(asMap(storageData));
         }
@@ -1361,7 +1361,7 @@ final class SpecialCpMapper {
 
     /** IFA011 clause 7.1.17.2. */
     static VipCpd mapVipCp(VipCp node) {
-        VipCpd.Builder builder = VipCpd.builder(IdRegistry.cpdId(node));
+        VipCpd.Builder builder = VipCpd.builder(VnfdUtils.cpdId(node));
         CpMapper.applyCommon(node, builder);
 
         VipCp.Properties p = node.getProperties();
@@ -1373,15 +1373,15 @@ final class SpecialCpMapper {
         if (r != null) {
             // Table 6.8.10.4-1: target has occurrences [1, UNBOUNDED] and points at VduCp nodes,
             // which is exactly IFA011 intCpd (M,1..N, a reference to VduCpd).
-            FlavourContext.orEmpty(r.getTarget()).forEach(builder::addIntCpd);
-            FlavourContext.first(r.getVirtualLink()).ifPresent(builder::intVirtualLinkDesc);
+            VnfdUtils.orEmpty(r.getTarget()).forEach(builder::addIntCpd);
+            VnfdUtils.first(r.getVirtualLink()).ifPresent(builder::intVirtualLinkDesc);
         }
         return builder.build();
     }
 
     /** IFA011 clause 7.1.18.2. */
     static VirtualCpd mapVirtualCp(VirtualCp node) {
-        VirtualCpd.Builder builder = VirtualCpd.builder(IdRegistry.cpdId(node));
+        VirtualCpd.Builder builder = VirtualCpd.builder(VnfdUtils.cpdId(node));
         CpMapper.applyCommon(node, builder);
 
         VirtualCp.Properties p = node.getProperties();
@@ -1391,7 +1391,7 @@ final class SpecialCpMapper {
         }
         VirtualCp.Requirements r = node.getRequirements();
         if (r != null) {
-            FlavourContext.orEmpty(r.getTarget()).forEach(builder::addVdu);
+            VnfdUtils.orEmpty(r.getTarget()).forEach(builder::addVdu);
         }
         return builder.build();
     }
@@ -1412,7 +1412,7 @@ final class ModuleAndCertificateMapper {
     /** IFA011 clause 7.1.19.2. */
     static CertificateDesc mapCertificate(Certificate node) {
         CertificateDesc.Builder builder =
-                CertificateDesc.builder(IdRegistry.certificateDescId(node));
+                CertificateDesc.builder(VnfdUtils.certificateDescId(node));
         Certificate.Properties p = node.getProperties();
         if (p != null) {
             builder.name(p.getName()).certificateType(p.getCertificateType());
@@ -1432,7 +1432,7 @@ final class ModuleAndCertificateMapper {
     static DeployableModule mapDeployableModule(
             com.example.etsi.vnfd.toscatype.node.DeployableModule node) {
         DeployableModule.Builder builder =
-                DeployableModule.builder(IdRegistry.deployableModuleId(node));
+                DeployableModule.builder(VnfdUtils.deployableModuleId(node));
         com.example.etsi.vnfd.toscatype.node.DeployableModule.Properties p = node.getProperties();
         if (p != null) {
             builder.name(p.getName()).description(p.getDescription());
@@ -1440,7 +1440,7 @@ final class ModuleAndCertificateMapper {
         com.example.etsi.vnfd.toscatype.node.DeployableModule.Requirements r = node.getRequirements();
         if (r != null) {
             // Table 6.8.16.4-1: member has occurrences [1, UNBOUNDED].
-            FlavourContext.orEmpty(r.getMember()).forEach(builder::addMember);
+            VnfdUtils.orEmpty(r.getMember()).forEach(builder::addMember);
         }
         return builder.build();
     }
@@ -1514,10 +1514,8 @@ final class LcmMapper {
             return Optional.empty();
         }
 
-        // [ASSUMPTION] lcmScriptId. IFA011 makes it 0..1 - "shall be present if there is the need to
-        // reference this script from another information element" - and says nothing about its form.
-        LifeCycleManagementScript.Builder builder =
-                LifeCycleManagementScript.builder(interfaceName + "." + operationName);
+        LifeCycleManagementScript.Builder builder = LifeCycleManagementScript.builder(
+                VnfdUtils.lcmScriptId(interfaceName, operationName));
         builder.script(primary);
         // [ASSUMPTION] scriptDsl is M,1 in IFA011 and SOL001 declares no language on a Vnflcm
         // operation, unlike HelmParamMappingScript (clause 6.3.4). The file extension is all the

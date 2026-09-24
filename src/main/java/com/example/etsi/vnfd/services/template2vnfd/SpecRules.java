@@ -92,7 +92,7 @@ final class SpecRules {
      */
     static void mciop(Mciop mciop, ArtifactSelector artifacts, Findings findings) {
         boolean associated = mciop.getRequirements() != null
-                && !FlavourContext.orEmpty(mciop.getRequirements().getAssociatedVdu()).isEmpty();
+                && !VnfdUtils.orEmpty(mciop.getRequirements().getAssociatedVdu()).isEmpty();
         if (!associated) {
             findings.error("C8", "SOL001 V5.4.1 cl. 6.8.14.6",
                     "Mciop " + mciop.getKey() + " is associated with no VDU; occurrences are "
