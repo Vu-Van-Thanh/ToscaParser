@@ -43,6 +43,8 @@ import com.example.etsi.vnfd.validation.Findings;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -190,8 +192,8 @@ public final class VnfdLoader {
         }
         // SOL001 gives block, object and file storage three node types; IFA011 clause 7.1.9.4.2 has
         // one information element carrying a typeOfStorage, so the node type is what decides it.
-        for (NfvNode storage : context.storages()) {
-            storages.map(storage).ifPresent(desc ->
+        for (NfvNode node : context.nodes()) {
+            storages.map(node).ifPresent(desc ->
                     merged.storages.putIfAbsent(desc.getId(), desc));
         }
         // Neither a VipCp nor a VirtualCp is a VduCp, so neither can go through the loop above:
@@ -246,15 +248,12 @@ final class FlavourContext {
     private final TypeReader.Hierarchy hierarchy;
     private final Findings findings;
 
-    private final List<VduOsContainerDeployableUnit> vdus = new ArrayList<>();
-    private final Map<String, VduOsContainer> containers = new LinkedHashMap<>();
-    private final Map<String, Cp> connectionPoints = new LinkedHashMap<>();
-    private final Map<String, VnfVirtualLink> virtualLinks = new LinkedHashMap<>();
-    private final List<Mciop> mciops = new ArrayList<>();
-    private final List<NfvNode> storages = new ArrayList<>();
-    private final List<Certificate> certificates = new ArrayList<>();
-    private final List<DeployableModule> deployableModules = new ArrayList<>();
-    private Vnf vnf;
+    /** Every node template this library could bind, in declaration order, keyed by node name. */
+    private final Map<String, NfvNode> nodes = new LinkedHashMap<>();
+
+    /** Typed views over {@link #nodes}, each computed the first time its type is asked for. */
+    private final Map<Class<?>, List<? extends NfvNode>> listViews = new HashMap<>();
+    private final Map<Class<?>, Map<String, ? extends NfvNode>> mapViews = new HashMap<>();
 
     private final Map<String, List<String>> cpsByVdu = new LinkedHashMap<>();
     private final Map<String, List<String>> mciopsByVdu = new LinkedHashMap<>();
@@ -268,57 +267,85 @@ final class FlavourContext {
         this.findings = findings;
         this.topology = template.topologyTemplate().orElseThrow(() -> new VnfdParseException(
                 "Service template has no topology_template: " + template.file()));
-        classify();
+        bindAll();
         index();
     }
 
-    private void classify() {
+    /**
+     * Binds every node template once.
+     *
+     * <p>Once, because {@code NodeBinder.bind} is not a pure function: it reports TYPE01 for a type
+     * it cannot resolve and runs the constraint checks the type declares. Binding a node a second
+     * time would report it a second time, so the bound nodes are kept and the typed views below are
+     * computed over them rather than by binding again.
+     */
+    private void bindAll() {
         for (NodeTemplate raw : topology.nodeTemplates().values()) {
-            Optional<NfvNode> bound = binder.bind(raw, topology.nodeTemplates());
-            if (!bound.isPresent()) {
-                continue;
-            }
-            NfvNode node = bound.get();
-            if (node instanceof Vnf) {
-                vnf = (Vnf) node;
-            } else if (node instanceof VduOsContainerDeployableUnit) {
-                vdus.add((VduOsContainerDeployableUnit) node);
-            } else if (node instanceof VduOsContainer) {
-                containers.put(node.getKey(), (VduOsContainer) node);
-            } else if (node instanceof Cp) {
-                connectionPoints.put(node.getKey(), (Cp) node);
-            } else if (node instanceof VnfVirtualLink) {
-                virtualLinks.put(node.getKey(), (VnfVirtualLink) node);
-            } else if (node instanceof Mciop) {
-                mciops.add((Mciop) node);
-            } else if (isStorage(node)) {
-                storages.add(node);
-            } else if (node instanceof Certificate) {
-                certificates.add((Certificate) node);
-            } else if (node instanceof DeployableModule) {
-                deployableModules.add((DeployableModule) node);
-            }
+            binder.bind(raw, topology.nodeTemplates())
+                    .ifPresent(node -> nodes.put(node.getKey(), node));
         }
     }
 
-    private boolean isStorage(NfvNode node) {
-        String etsi = node.getEtsiType();
-        return etsi != null && etsi.startsWith("tosca.nodes.nfv.Vdu.Virtual")
-                && etsi.endsWith("Storage");
+    /**
+     * Every bound node of the given type, in declaration order.
+     *
+     * <p>The type is an argument rather than a branch of a chain of {@code instanceof}, so a node
+     * type added to {@code NodeTypes.ALL} is readable here without this class being edited.
+     */
+    <T extends NfvNode> List<T> nodesOf(Class<T> type) {
+        @SuppressWarnings("unchecked")
+        List<T> cached = (List<T>) listViews.get(type);
+        if (cached != null) {
+            return cached;
+        }
+        List<T> out = new ArrayList<>();
+        for (NfvNode node : nodes.values()) {
+            if (type.isInstance(node)) {
+                out.add(type.cast(node));
+            }
+        }
+        List<T> view = Collections.unmodifiableList(out);
+        listViews.put(type, view);
+        return view;
+    }
+
+    /** The same nodes keyed by node template name, so a lookup by name stays O(1). */
+    <T extends NfvNode> Map<String, T> indexOf(Class<T> type) {
+        @SuppressWarnings("unchecked")
+        Map<String, T> cached = (Map<String, T>) mapViews.get(type);
+        if (cached != null) {
+            return cached;
+        }
+        Map<String, T> out = new LinkedHashMap<>();
+        for (T node : nodesOf(type)) {
+            out.put(node.getKey(), node);
+        }
+        Map<String, T> view = Collections.unmodifiableMap(out);
+        mapViews.put(type, view);
+        return view;
+    }
+
+    /**
+     * Every bound node, in declaration order, for a mapper that decides by type itself.
+     *
+     * <p>SOL001 gives block, object and file storage three node types with no common supertype, so
+     * no single {@link #nodesOf} call reproduces them - and asking three times would group the
+     * result by type instead of by declaration order.
+     */
+    Collection<NfvNode> nodes() {
+        return Collections.unmodifiableCollection(nodes.values());
     }
 
     private void index() {
         // A connection point names its VDU, never the other way round (SOL001 clause 6.8.8).
-        for (Cp cp : connectionPoints.values()) {
-            if (cp instanceof VduCp) {
-                VnfdUtils.first(((VduCp) cp).getRequirements() == null
-                        ? null : ((VduCp) cp).getRequirements().getVirtualBinding())
-                        .ifPresent(vdu -> cpsByVdu
-                                .computeIfAbsent(vdu, key -> new ArrayList<>()).add(cp.getKey()));
-            }
+        for (VduCp cp : nodesOf(VduCp.class)) {
+            VnfdUtils.first(cp.getRequirements() == null
+                    ? null : cp.getRequirements().getVirtualBinding())
+                    .ifPresent(vdu -> cpsByVdu
+                            .computeIfAbsent(vdu, key -> new ArrayList<>()).add(cp.getKey()));
         }
         // An MCIOP names its VDUs, and may name several (occurrences [1, UNBOUNDED]).
-        for (Mciop mciop : mciops) {
+        for (Mciop mciop : nodesOf(Mciop.class)) {
             if (mciop.getRequirements() == null) {
                 continue;
             }
@@ -331,7 +358,6 @@ final class FlavourContext {
                 .ifPresent(m -> externallyExposedCps.addAll(m.exposedNodeTemplates()));
     }
 
-    /** Where the mappers report what the descriptor got wrong. */
     /** Every artifact of that ETSI type on the node, matched through {@code derived_from}. */
     List<ArtifactDefinition> artifactsOfType(NfvNode node, String etsiArtifactType) {
         return VnfdUtils.artifactsOfType(hierarchy, node, etsiArtifactType);
@@ -354,40 +380,43 @@ final class FlavourContext {
         return topology;
     }
 
+    /**
+     * The VNF node of this flavour, last declaration winning as it always has.
+     *
+     * <p>SOL001 clause 6.11.2 gives a flavour template one VNF node, so a second one is already
+     * malformed; this only says which of them is read.
+     */
     Optional<Vnf> vnf() {
-        return Optional.ofNullable(vnf);
+        List<Vnf> all = nodesOf(Vnf.class);
+        return all.isEmpty() ? Optional.empty() : Optional.of(all.get(all.size() - 1));
     }
 
     List<VduOsContainerDeployableUnit> vdus() {
-        return vdus;
+        return nodesOf(VduOsContainerDeployableUnit.class);
     }
 
     Map<String, VduOsContainer> containers() {
-        return containers;
+        return indexOf(VduOsContainer.class);
     }
 
     Map<String, Cp> connectionPoints() {
-        return connectionPoints;
+        return indexOf(Cp.class);
     }
 
     Map<String, VnfVirtualLink> virtualLinks() {
-        return virtualLinks;
+        return indexOf(VnfVirtualLink.class);
     }
 
     List<Mciop> mciops() {
-        return mciops;
-    }
-
-    List<NfvNode> storages() {
-        return storages;
+        return nodesOf(Mciop.class);
     }
 
     List<Certificate> certificates() {
-        return certificates;
+        return nodesOf(Certificate.class);
     }
 
     List<DeployableModule> deployableModules() {
-        return deployableModules;
+        return nodesOf(DeployableModule.class);
     }
 
     List<PolicyDefinition> policies() {
