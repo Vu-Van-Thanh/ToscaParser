@@ -1,11 +1,5 @@
 package com.example.etsi.vnfd.template;
 
-import com.example.etsi.vnfd.template.GroupDefinition;
-import com.example.etsi.vnfd.template.NodeTemplate;
-import com.example.etsi.vnfd.template.ParameterDefinition;
-import com.example.etsi.vnfd.template.PolicyDefinition;
-import com.example.etsi.vnfd.template.RelationshipTemplate;
-import com.example.etsi.vnfd.template.SubstitutionMappings;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

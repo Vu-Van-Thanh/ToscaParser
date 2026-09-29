@@ -459,7 +459,7 @@ public final class TypeReader {
          * where {@code tosca.artifacts.nfv.SwImage} keeps {@code name}, {@code version} and
          * {@code checksum}, and where {@code HelmParamMappingScript} keeps {@code language}.
          */
-        public Map<String, PropertyDef> effectivePropertiesOfAnyType(String typeName) {
+        public Map<String, PropertyDef> propertiesWithAncestors(String typeName) {
             Map<String, PropertyDef> effective = new LinkedHashMap<>();
             List<String> chain = ancestry(typeName);
             for (int i = chain.size() - 1; i >= 0; i--) {
@@ -470,7 +470,36 @@ public final class TypeReader {
 
         /** A single property declaration visible on a type of any category. */
         public Optional<PropertyDef> anyPropertyDef(String typeName, String propertyName) {
-            return Optional.ofNullable(effectivePropertiesOfAnyType(typeName).get(propertyName));
+            return Optional.ofNullable(propertiesWithAncestors(typeName).get(propertyName));
+        }
+
+        /**
+         * The assigned properties of a template or artifact declaration, with the defaults its type
+         * declares filled in underneath.
+         *
+         * <p>Not a nicety. SOL001 V5.4.1 Annex A.23 writes a VNF node template that assigns only
+         * {@code flavour_description}, leaving {@code descriptor_id}, {@code provider},
+         * {@code software_version} and the rest on the VNF-specific node type. Binding the template
+         * alone yields a VNFD with no identifier at all. Clause 6.11.2 makes that arrangement the
+         * normal one, not an edge case, since it requires the VNF node type to be derived from
+         * {@code tosca.nodes.nfv.VNF}.
+         *
+         * <p>The template wins where it speaks - merging two maps is exactly the semantics wanted, and
+         * it needs no reflection over the bound object.
+         *
+         * @param typeName the type the declaration names, which may be a vendor type
+         * @param assigned the {@code properties} block of the declaration
+         */
+        public Map<String, Object> fillPropertyDefaultsWithAncestors(String typeName,
+                Map<String, Object> assigned) {
+            Map<String, Object> merged = new LinkedHashMap<>();
+            for (Map.Entry<String, PropertyDef> e : propertiesWithAncestors(typeName).entrySet()) {
+                e.getValue().defaultValue().ifPresent(value -> merged.put(e.getKey(), value));
+            }
+            if (assigned != null) {
+                merged.putAll(assigned);
+            }
+            return merged;
         }
 
         public TypeRegistry registry() {

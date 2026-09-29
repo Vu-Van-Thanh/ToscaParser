@@ -66,7 +66,7 @@ class PolicyArtifactGen {
 
     private String render(TypeReader.Hierarchy h, String[] t, String pkg, String base) {
         String etsi = t[0];
-        Map<String, PropertyDef> props = new LinkedHashMap<>(h.effectivePropertiesOfAnyType(etsi));
+        Map<String, PropertyDef> props = new LinkedHashMap<>(h.propertiesWithAncestors(etsi));
 
         Set<String> imports = new TreeSet<>(Arrays.asList(
                 "com.example.etsi.vnfd.toscatype.node.EtsiNodeType",

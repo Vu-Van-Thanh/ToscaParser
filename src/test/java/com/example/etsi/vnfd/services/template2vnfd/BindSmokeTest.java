@@ -20,7 +20,7 @@ class BindSmokeTest {
 
     private Map<String, NfvNode> bind(String pkg) {
         ServiceToscaTemplate tst = new PackageReader(Fixtures.packageDir(pkg)).parse();
-        NodeBinder binder = new NodeBinder(new TypeReader.Hierarchy(tst.typeRegistry()), NodeTypes.ALL);
+        NodeBinder binder = new NodeBinder(new TypeReader.Hierarchy(tst.typeRegistry()));
         Map<String, NfvNode> out = new LinkedHashMap<>();
         for (Map.Entry<String, NodeTemplate> e :
                 tst.flavourTemplates().get(0).topologyTemplate().get().nodeTemplates().entrySet()) {

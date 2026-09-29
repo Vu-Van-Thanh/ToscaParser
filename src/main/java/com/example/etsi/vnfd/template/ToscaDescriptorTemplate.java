@@ -1,6 +1,5 @@
 package com.example.etsi.vnfd.template;
 
-import com.example.etsi.vnfd.template.RepositoryDefinition;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

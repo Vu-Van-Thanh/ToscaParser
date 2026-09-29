@@ -1,10 +1,12 @@
-package com.example.etsi.vnfd.services.template2vnfd;
+package com.example.etsi.vnfd.services.template2vnfd.validator;
 
 import com.example.etsi.vnfd.model.LcmRealizationPath;
 import com.example.etsi.vnfd.model.LifeCycleManagementScript;
 import com.example.etsi.vnfd.model.Vdu;
 import com.example.etsi.vnfd.model.VnfDf;
 import com.example.etsi.vnfd.model.Vnfd;
+import com.example.etsi.vnfd.services.template2vnfd.FlavourContext;
+import com.example.etsi.vnfd.services.template2vnfd.VnfdUtils;
 import com.example.etsi.vnfd.template.ArtifactDefinition;
 import com.example.etsi.vnfd.toscatype.node.Mciop;
 import com.example.etsi.vnfd.toscatype.node.NfvNode;
@@ -24,12 +26,12 @@ import java.util.List;
  * it names a default for. Mixing the two would bury the citations inside the translation.
  *
  * <p>Checks that a type definition already expresses - {@code required}, {@code constraints} - are
- * not here; {@code ConstraintChecker} runs those against the {@code TypeRegistry} while binding, so
+ * not here; {@link ConstraintValidator} runs those against the {@code TypeRegistry} while binding, so
  * they need no Java. What remains is what the YAML type files cannot say.
  */
-final class SpecRules {
+public final class SpecRuleValidator {
 
-    private SpecRules() {
+    private SpecRuleValidator() {
     }
 
     /**
@@ -41,7 +43,7 @@ final class SpecRules {
      * whole service template: a flavour holding one MCIOP-realized VDU and one OsContainer-realized
      * VDU satisfies 6.8.13.7 while still leaving the first VDU undescribed.
      */
-    static void mciopCoverage(VduOsContainerDeployableUnit vdu, LcmRealizationPath path,
+    public static void mciopCoverage(VduOsContainerDeployableUnit vdu, LcmRealizationPath path,
             Findings findings) {
         if (path == LcmRealizationPath.UNDETERMINED) {
             findings.error("C2", "IFA011 V5.4.1 cl. 7.1.6.2.2 Note 10",
@@ -55,7 +57,7 @@ final class SpecRules {
      * IFA011 V5.4.1 clause 7.1.6.2.2: {@code mcioIdentificationData} shall be present when the VDU
      * is realized by one or a set of OS containers. Every VDU in scope of this library is.
      */
-    static void mcioIdentificationData(VduOsContainerDeployableUnit vdu, Findings findings) {
+    public static void mcioIdentificationData(VduOsContainerDeployableUnit vdu, Findings findings) {
         boolean present = vdu.getProperties() != null
                 && vdu.getProperties().getMcioIdentificationData() != null;
         if (!present) {
@@ -70,7 +72,7 @@ final class SpecRules {
      * SOL001 V5.4.1 clause 6.8.12.6: a {@code Vdu.OsContainer} shall contain one artifact of type
      * {@code tosca.artifacts.nfv.SwImage}, and at most one.
      */
-    static void swImage(VduOsContainer container, FlavourContext context) {
+    public static void swImage(VduOsContainer container, FlavourContext context) {
         Findings findings = context.findings();
         List<ArtifactDefinition> images =
                 context.artifactsOfType(container, EtsiTypes.ARTIFACT_SW_IMAGE);
@@ -91,7 +93,7 @@ final class SpecRules {
      * clause 6.8.14.7 caps each artifact type at one per {@code Mciop} while making
      * {@code HelmParamMappingRule} meaningful only alongside a {@code HelmParamMappingScript}.
      */
-    static void mciop(Mciop mciop, FlavourContext context) {
+    public static void mciop(Mciop mciop, FlavourContext context) {
         Findings findings = context.findings();
         boolean associated = mciop.getRequirements() != null
                 && !VnfdUtils.orEmpty(mciop.getRequirements().getAssociatedVdu()).isEmpty();
@@ -127,7 +129,7 @@ final class SpecRules {
      * present if there are multiple instantiationLevel entries, and {@code mciopProfile} shall be
      * present if the DF references, via the vduProfile, containerized workloads based on a MCIOP.
      */
-    static void flavour(VnfDf df, List<Vdu> vdus, Findings findings) {
+    public static void validateFlavour(VnfDf df, List<Vdu> vdus, Findings findings) {
         SourceRef source = df.getSourceFile().map(SourceRef::ofFile).orElse(null);
 
         if (df.getInstantiationLevel().size() > 1
@@ -164,7 +166,7 @@ final class SpecRules {
      * <p>Not fatal. The script is still produced, because a consumer that knows more about the
      * operation than this library does can still use it.
      */
-    static void lifecycleScriptHasEvent(LifeCycleManagementScript script, String sourceFile,
+    public static void lifecycleScriptHasEvent(LifeCycleManagementScript script, String sourceFile,
             Findings findings) {
         if (script.getEvent().isEmpty() && script.getLcmTransitionEvent().isEmpty()) {
             findings.error("C24", "IFA011 V5.4.1 cl. 7.1.13.2 NOTE 1",
@@ -182,7 +184,7 @@ final class SpecRules {
      * can select, and silently emitting one is how a descriptor that says nothing useful passes for
      * one that does.
      */
-    static void flavourIdentified(VnfDf df, String sourceFile, Findings findings) {
+    public static void flavourIdentified(VnfDf df, String sourceFile, Findings findings) {
         if (df.getFlavourId().isEmpty()) {
             findings.error("C29", "IFA011 V5.4.1 cl. 7.1.8.2.2",
                     "The deployment flavour in " + sourceFile + " has no flavour_id: none is set by "
@@ -197,7 +199,7 @@ final class SpecRules {
      * shall contain at least one element. Only the latter two exist in a CNF, so a VNFD declaring
      * neither describes no workload at all.
      */
-    static void note6(Vnfd vnfd, Findings findings) {
+    public static void validateVnfd(Vnfd vnfd, Findings findings) {
         if (vnfd.getOsContainerDesc().isEmpty() && vnfd.getMciopId().isEmpty()) {
             findings.error("C1", "IFA011 V5.4.1 cl. 7.1.2.2 Note 6",
                     "The VNFD declares neither osContainerDesc nor mciopId, so no workload is "

@@ -40,7 +40,7 @@ class DtGen {
         while (!todo.isEmpty()) {
             String t = todo.poll();
             if (!seen.add(t)) continue;
-            for (PropertyDef d : h.effectivePropertiesOfAnyType(t).values()) collect(d, dts, todo);
+            for (PropertyDef d : h.propertiesWithAncestors(t).values()) collect(d, dts, todo);
         }
 
         Path dir = Paths.get(OUT);
@@ -62,7 +62,7 @@ class DtGen {
     }
 
     private String render(String simple, String fqn, TypeReader.Hierarchy h) {
-        Map<String, PropertyDef> props = h.effectivePropertiesOfAnyType(fqn);
+        Map<String, PropertyDef> props = h.propertiesWithAncestors(fqn);
         StringBuilder b = new StringBuilder();
         Set<String> imports = new TreeSet<>();
         StringBuilder body = new StringBuilder();

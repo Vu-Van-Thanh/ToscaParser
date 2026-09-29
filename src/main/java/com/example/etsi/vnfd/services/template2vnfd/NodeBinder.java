@@ -5,7 +5,7 @@ import com.example.etsi.vnfd.services.pkg2template.TypeReader;
 import com.example.etsi.vnfd.template.ArtifactDefinition;
 import com.example.etsi.vnfd.template.NodeTemplate;
 import com.example.etsi.vnfd.template.RequirementAssignment;
-import com.example.etsi.vnfd.template.SourceRef;
+import com.example.etsi.vnfd.services.template2vnfd.validator.ConstraintValidator;
 import com.example.etsi.vnfd.template.value.Literal;
 import com.example.etsi.vnfd.template.value.PropertyValue;
 import com.example.etsi.vnfd.template.value.Quantity;
@@ -26,18 +26,14 @@ import com.example.etsi.vnfd.toscatype.node.VirtualCp;
 import com.example.etsi.vnfd.toscatype.node.Vnf;
 import com.example.etsi.vnfd.toscatype.node.VnfExtCp;
 import com.example.etsi.vnfd.toscatype.node.VnfVirtualLink;
-import com.example.etsi.vnfd.typedef.Constraint;
-import com.example.etsi.vnfd.typedef.PropertyDef;
 import com.example.etsi.vnfd.validation.Findings;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.BeanProperty;
 import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.ContextualDeserializer;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -74,21 +70,18 @@ public final class NodeBinder {
             "[PROJECT-SPECIFIC] SOL001 V5.4.1 Annex B.2 NOTE 2";
 
     private final ObjectMapper mapper = ToscaBindModule.mapper();
-    private final NodeTypeResolver resolver;
-    private final TypeDefaults defaults;
-    private final ConstraintChecker constraints;
+    private final TypeReader.Hierarchy hierarchy;
+    private final ConstraintValidator constraints;
     private final Findings findings;
 
     /** Binds without reporting: the caller does not want the conformance findings. */
-    public NodeBinder(TypeReader.Hierarchy hierarchy, List<Class<? extends NfvNode>> nodeClasses) {
-        this(hierarchy, nodeClasses, new Findings());
+    public NodeBinder(TypeReader.Hierarchy hierarchy) {
+        this(hierarchy, new Findings());
     }
 
-    public NodeBinder(TypeReader.Hierarchy hierarchy, List<Class<? extends NfvNode>> nodeClasses,
-            Findings findings) {
-        this.resolver = new NodeTypeResolver(hierarchy, nodeClasses);
-        this.defaults = new TypeDefaults(hierarchy);
-        this.constraints = new ConstraintChecker(hierarchy, findings);
+    public NodeBinder(TypeReader.Hierarchy hierarchy, Findings findings) {
+        this.hierarchy = hierarchy;
+        this.constraints = new ConstraintValidator(hierarchy, findings);
         this.findings = findings;
     }
 
@@ -107,7 +100,7 @@ public final class NodeBinder {
      * and one that merely refers to itself.
      */
     public Optional<NfvNode> bind(NodeTemplate template, Map<String, NodeTemplate> topology) {
-        Optional<Class<? extends NfvNode>> target = resolver.resolve(template.type());
+        Optional<Class<? extends NfvNode>> target = NodeTypes.resolve(hierarchy, template.type());
         if (!target.isPresent()) {
             findings.error("TYPE01", CLAUSE_TYPE_RESOLUTION,
                     "Node template " + template.name() + " declares type " + template.type()
@@ -117,7 +110,8 @@ public final class NodeBinder {
             return Optional.empty();
         }
 
-        Map<String, Object> merged = defaults.apply(template.type(), template.properties());
+        Map<String, Object> merged =
+                hierarchy.fillPropertyDefaultsWithAncestors(template.type(), template.properties());
         merged = resolveGetProperty(merged, template, topology);
         constraints.check(template.type(), merged, template.source());
         checkArtifacts(template);
@@ -139,7 +133,7 @@ public final class NodeBinder {
         node.setArtifacts(template.artifacts());
         node.setKey(template.name());
         node.setSource(template.source());
-        node.setEtsiType(resolver.etsiTypeOf(template.type()).orElse(template.type()));
+        node.setEtsiType(NodeTypes.etsiTypeOf(hierarchy, template.type()).orElse(template.type()));
         return Optional.of(node);
     }
 
@@ -157,7 +151,7 @@ public final class NodeBinder {
         }
         for (ArtifactDefinition artifact : template.artifacts().values()) {
             constraints.check(artifact.type(),
-                    defaults.apply(artifact.type(), artifact.properties()),
+                    hierarchy.fillPropertyDefaultsWithAncestors(artifact.type(), artifact.properties()),
                     artifact.source());
         }
     }
@@ -240,7 +234,8 @@ public final class NodeBinder {
             return null;
         }
         try {
-            Map<String, Object> source = defaults.apply(target.type(), target.properties());
+            Map<String, Object> source =
+                    hierarchy.fillPropertyDefaultsWithAncestors(target.type(), target.properties());
             Object found = source;
             for (Object step : args.subList(1, args.size())) {
                 if (!(found instanceof Map)) {
@@ -279,10 +274,6 @@ public final class NodeBinder {
         return bind(template).filter(expected::isInstance).map(expected::cast);
     }
 
-    public NodeTypeResolver resolver() {
-        return resolver;
-    }
-
     /**
      * Requirements as a map of name to target list.
      *
@@ -302,61 +293,13 @@ public final class NodeBinder {
 }
 
 /**
- * Decides which SOL001 class a node template belongs to.
- *
- * <p>By {@code derived_from}, never by comparing type names - see {@link EtsiNodeType} for why.
- * When a declared type derives from several of the registered ETSI types, the nearest ancestor
- * wins, which is what separates {@code VduSubCp} from {@code VduCp} from {@code Cp} without anyone
- * having to state a precedence.
- */
-final class NodeTypeResolver {
-
-    private final TypeReader.Hierarchy hierarchy;
-    private final Map<String, Class<? extends NfvNode>> byEtsiType;
-
-    public NodeTypeResolver(TypeReader.Hierarchy hierarchy, List<Class<? extends NfvNode>> classes) {
-        this.hierarchy = hierarchy;
-        Map<String, Class<? extends NfvNode>> map = new LinkedHashMap<>();
-        for (Class<? extends NfvNode> type : classes) {
-            EtsiNodeType annotation = type.getAnnotation(EtsiNodeType.class);
-            if (annotation == null) {
-                throw new IllegalStateException(type.getName() + " has no @EtsiNodeType");
-            }
-            map.put(annotation.value(), type);
-        }
-        this.byEtsiType = Collections.unmodifiableMap(map);
-    }
-
-    /** The class for a declared type, or empty when it derives from none of the ETSI node types. */
-    public Optional<Class<? extends NfvNode>> resolve(String declaredType) {
-        if (declaredType == null) {
-            return Optional.empty();
-        }
-        return hierarchy.nearestAncestorAmong(declaredType, byEtsiType.keySet())
-                .map(byEtsiType::get);
-    }
-
-    /** The ETSI type a declared type was recognised as. */
-    public Optional<String> etsiTypeOf(String declaredType) {
-        return declaredType == null
-                ? Optional.empty()
-                : hierarchy.nearestAncestorAmong(declaredType, byEtsiType.keySet());
-    }
-
-    /** The registered ETSI types, for diagnostics and for the property cross-check test. */
-    public Map<String, Class<? extends NfvNode>> registered() {
-        return byEtsiType;
-    }
-}
-
-/**
- * The node classes this library binds.
+ * The node classes this library binds, and the ETSI type each declared type resolves to.
  *
  * <p>An explicit list rather than a classpath scan: scanning needs a library this project does not
  * carry, and a list of class literals costs one line per type while still keeping the ETSI type
- * name in the class itself, where {@code @EtsiNodeType} declares it. Order does not matter - the
- * resolver picks the nearest ancestor, so {@code VduSubCp} wins over {@code VduCp} over {@code Cp}
- * without anyone stating a precedence.
+ * name in the class itself, where {@code @EtsiNodeType} declares it. Order does not matter -
+ * {@link #resolve} picks the nearest ancestor, so {@code VduSubCp} wins over {@code VduCp} over
+ * {@code Cp} without anyone stating a precedence.
  */
 final class NodeTypes {
 
@@ -379,142 +322,46 @@ final class NodeTypes {
                     DeployableModule.class,
                     Certificate.class));
 
+    /** {@link #ALL}, indexed by the ETSI type each class declares - built once, since ALL is fixed. */
+    private static final Map<String, Class<? extends NfvNode>> BY_ETSI_TYPE = index();
+
     private NodeTypes() {
     }
-}
-
-/**
- * Lays the defaults a type declares under the values a template assigns.
- *
- * <p>Not a nicety. SOL001 V5.4.1 Annex A.23 writes a VNF node template that assigns only
- * {@code flavour_description}, leaving {@code descriptor_id}, {@code provider},
- * {@code software_version} and the rest on the VNF-specific node type. Binding the template alone
- * yields a VNFD with no identifier at all. Clause 6.11.2 makes that arrangement the normal one, not
- * an edge case, since it requires the VNF node type to be derived from {@code tosca.nodes.nfv.VNF}.
- *
- * <p>Applied before binding rather than after: merging two maps is exactly the semantics wanted -
- * the template wins where it speaks - and it needs no reflection over the bound object.
- */
-final class TypeDefaults {
-
-    private final TypeReader.Hierarchy hierarchy;
-
-    public TypeDefaults(TypeReader.Hierarchy hierarchy) {
-        this.hierarchy = hierarchy;
-    }
 
     /**
-     * The assigned properties with type defaults filled in.
+     * The class for a declared type, or empty when it derives from none of the ETSI node types.
      *
-     * @param declaredType the type the template declares, which may be a vendor type
-     * @param assigned     the {@code properties} block of the template
+     * <p>By {@code derived_from}, never by comparing type names - see {@link EtsiNodeType} for why.
+     * When a declared type derives from several of the registered ETSI types, the nearest ancestor
+     * wins, which is what separates {@code VduSubCp} from {@code VduCp} from {@code Cp} without
+     * anyone having to state a precedence.
      */
-    public Map<String, Object> apply(String declaredType, Map<String, Object> assigned) {
-        Map<String, Object> merged = new LinkedHashMap<>();
-        for (Map.Entry<String, PropertyDef> e
-                : hierarchy.effectivePropertiesOfAnyType(declaredType).entrySet()) {
-            e.getValue().defaultValue().ifPresent(value -> merged.put(e.getKey(), value));
+    public static Optional<Class<? extends NfvNode>> resolve(TypeReader.Hierarchy hierarchy,
+            String declaredType) {
+        if (declaredType == null) {
+            return Optional.empty();
         }
-        if (assigned != null) {
-            merged.putAll(assigned);
-        }
-        return merged;
-    }
-}
-
-/**
- * Checks assigned properties against what their type declares.
- *
- * <p>Both what is checked and what counts as a violation come from the type definitions rather than
- * from annotations on the model. {@code required: true} and {@code constraints:} are written in
- * {@code etsi_nfv_sol001_vnfd_types.yaml}; stating them again in Java would create a second copy of
- * the same rule, and the two drift the moment ETSI publishes a new version.
- *
- * <p>A value still bound to an input or a runtime attribute is skipped: SOL001 V5.4.1 clause 5.9
- * allows the expression, and there is nothing to check until something evaluates it.
- */
-final class ConstraintChecker {
-
-    private static final String CLAUSE_CONSTRAINTS = "TOSCA Simple Profile YAML 1.3 cl. 3.6.3";
-    private static final String CLAUSE_REQUIRED = "TOSCA Simple Profile YAML 1.3 cl. 3.6.2";
-    private static final String CLAUSE_SCALAR_UNIT = "TOSCA Simple Profile YAML 1.3 cl. 3.3.6";
-    private static final String SCALAR_UNIT_SIZE = "scalar-unit.size";
-
-    private final TypeReader.Hierarchy hierarchy;
-    private final Findings findings;
-
-    public ConstraintChecker(TypeReader.Hierarchy hierarchy, Findings findings) {
-        this.hierarchy = hierarchy;
-        this.findings = findings;
+        return hierarchy.nearestAncestorAmong(declaredType, BY_ETSI_TYPE.keySet())
+                .map(BY_ETSI_TYPE::get);
     }
 
-    /**
-     * @param declaredType the type the declaration names, which may be a vendor type
-     * @param merged       the properties after {@link TypeDefaults} has been applied
-     */
-    public void check(String declaredType, Map<String, Object> merged, SourceRef source) {
-        Map<String, PropertyDef> declared = hierarchy.effectivePropertiesOfAnyType(declaredType);
-        for (Map.Entry<String, PropertyDef> e : declared.entrySet()) {
-            PropertyDef def = e.getValue();
-            Object assigned = merged.get(e.getKey());
+    /** The ETSI type a declared type was recognised as. */
+    public static Optional<String> etsiTypeOf(TypeReader.Hierarchy hierarchy, String declaredType) {
+        return declaredType == null
+                ? Optional.empty()
+                : hierarchy.nearestAncestorAmong(declaredType, BY_ETSI_TYPE.keySet());
+    }
 
-            if (assigned == null) {
-                if (def.isRequired()) {
-                    findings.error("TOSCA02", CLAUSE_REQUIRED,
-                            "Required property " + e.getKey() + " is missing on a node of type "
-                                    + declaredType,
-                            ref(source));
-                }
-                continue;
+    private static Map<String, Class<? extends NfvNode>> index() {
+        Map<String, Class<? extends NfvNode>> map = new LinkedHashMap<>();
+        for (Class<? extends NfvNode> type : ALL) {
+            EtsiNodeType annotation = type.getAnnotation(EtsiNodeType.class);
+            if (annotation == null) {
+                throw new IllegalStateException(type.getName() + " has no @EtsiNodeType");
             }
-
-            PropertyValue<Object> parsed = TemplateReader.parsePropertyValue(assigned);
-            if (!parsed.isResolved()) {
-                continue;
-            }
-            Object candidate = parsed.resolved().orElse(null);
-            checkScalarUnit(e.getKey(), def, candidate, source);
-            checkAll(e.getKey(), def.constraints(), candidate, source);
-            def.entrySchema().ifPresent(entry -> {
-                if (candidate instanceof List) {
-                    for (Object element : (List<?>) candidate) {
-                        checkAll(e.getKey(), entry.constraints(), element, source);
-                    }
-                }
-            });
+            map.put(annotation.value(), type);
         }
-    }
-
-    /**
-     * TOSCA 1.3 clause 3.3.6 spells a scalar-unit as {@code <scalar> <unit>}, with the space.
-     *
-     * <p>A package writing {@code 128MB} is still readable, and rejecting it would be worse than
-     * saying so - all three bundled packages write it that way - but it is not conformant, and a
-     * consumer comparing descriptors from different vendors should know.
-     */
-    private void checkScalarUnit(String name, PropertyDef def, Object candidate, SourceRef source) {
-        if (!SCALAR_UNIT_SIZE.equals(def.type()) || !(candidate instanceof String)) {
-            return;
-        }
-        TemplateReader.parseScalarUnit((String) candidate)
-                .filter(q -> !q.hasCanonicalSpacing())
-                .ifPresent(q -> findings.warn("TOSCA01", CLAUSE_SCALAR_UNIT,
-                        "Property " + name + " writes " + q.originalText()
-                                + " without a space between the value and the unit",
-                        ref(source)));
-    }
-
-    private void checkAll(String name, List<Constraint> constraints, Object candidate,
-            SourceRef source) {
-        for (Constraint constraint : constraints) {
-            Optional<String> violation = TypeReader.validate(constraint, candidate);
-            violation.ifPresent(message -> findings.warn("TOSCA03", CLAUSE_CONSTRAINTS,
-                    "Property " + name + " violates constraint " + message, ref(source)));
-        }
-    }
-
-    private static com.example.etsi.vnfd.validation.SourceRef ref(SourceRef source) {
-        return source == null ? null : source.toFindingRef();
+        return Collections.unmodifiableMap(map);
     }
 }
 
@@ -613,38 +460,5 @@ final class PropertyValueDeserializer extends JsonDeserializer<PropertyValue<?>>
     /** Whether a value survived as a literal - used by callers that need the plain value. */
     public static Optional<Object> literalOf(PropertyValue<?> value) {
         return value == null ? Optional.empty() : Optional.ofNullable(value.resolved().orElse(null));
-    }
-}
-
-/**
- * The Jackson configuration used to bind TOSCA declarations onto the SOL001 classes.
- *
- * <p>Kept here rather than annotated onto the classes so the model stays free of binding concerns,
- * and so there is one place that says how a descriptor is read.
- */
-final class ToscaBindModule extends SimpleModule {
-
-    private static final long serialVersionUID = 1L;
-
-    public ToscaBindModule() {
-        super("etsi-tosca-bind");
-        addDeserializer(PropertyValue.class, new PropertyValueDeserializer());
-    }
-
-
-    /**
-     * A mapper configured for descriptor binding.
-     *
-     * <p>Unknown properties are ignored on purpose: a descriptor may carry vendor keynames, and
-     * TOSCA 1.3 has keynames SOL001 never uses. Failing on them would reject valid packages; what
-     * matters instead is that every property the ETSI type declares is read, which
-     * {@code ConstraintChecker} verifies from the type definitions.
-     */
-    public static ObjectMapper mapper() {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.registerModule(new ToscaBindModule());
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        mapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
-        return mapper;
     }
 }

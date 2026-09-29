@@ -21,7 +21,7 @@ import java.util.Optional;
  * twelve are [ASSUMPTION]. Spread across the mappers it would be impossible to see which is which,
  * so each keeps the javadoc that says where it comes from.
  */
-final class VnfdUtils {
+public final class VnfdUtils {
 
     private VnfdUtils() {
     }
@@ -36,27 +36,27 @@ final class VnfdUtils {
      * information element and hence it will be used in APIs to identify the software image id from
      * the VNFD perspective".
      */
-    static String swImageDescId(NfvNode owningNode) {
+    public static String swImageDescId(NfvNode owningNode) {
         return owningNode.getKey();
     }
 
     /** [ASSUMPTION] The node template name. SOL001 states the rule only for SwImageDesc. */
-    static String vduId(NfvNode node) {
+    public static String vduId(NfvNode node) {
         return node.getKey();
     }
 
     /** [ASSUMPTION] As above. */
-    static String osContainerDescId(NfvNode node) {
+    public static String osContainerDescId(NfvNode node) {
         return node.getKey();
     }
 
     /** [ASSUMPTION] As above. */
-    static String virtualStorageDescId(NfvNode node) {
+    public static String virtualStorageDescId(NfvNode node) {
         return node.getKey();
     }
 
     /** [ASSUMPTION] As above. */
-    static String cpdId(NfvNode node) {
+    public static String cpdId(NfvNode node) {
         return node.getKey();
     }
 
@@ -67,7 +67,7 @@ final class VnfdUtils {
      * is derived; the only place SOL001 states that rule outright is clause 6.8.12.6, for
      * SwImageDesc.
      */
-    static String certificateDescId(NfvNode node) {
+    public static String certificateDescId(NfvNode node) {
         return node.getKey();
     }
 
@@ -78,12 +78,12 @@ final class VnfdUtils {
      * to agree with whatever {@code VduProfile.deployableModule} names, since that is the reference
      * IFA011 uses to attach a VDU to a module.
      */
-    static String deployableModuleId(NfvNode node) {
+    public static String deployableModuleId(NfvNode node) {
         return node.getKey();
     }
 
     /** [ASSUMPTION] As above. */
-    static String virtualLinkDescId(NfvNode node) {
+    public static String virtualLinkDescId(NfvNode node) {
         return node.getKey();
     }
 
@@ -95,12 +95,12 @@ final class VnfdUtils {
      * offers, and SOL001 Table 6.1-1 NOTE 3 maps {@code associatedVdu} and {@code deploymentOrder}
      * onto this node type, so the profile is built around it either way.
      */
-    static String mciopId(NfvNode node) {
+    public static String mciopId(NfvNode node) {
         return node.getKey();
     }
 
     /** [ASSUMPTION] The artifact definition name. */
-    static String lcmOpParameterMappingScriptId(ArtifactDefinition artifact) {
+    public static String lcmOpParameterMappingScriptId(ArtifactDefinition artifact) {
         return artifact.name();
     }
 
@@ -110,7 +110,7 @@ final class VnfdUtils {
      * <p>SOL001 Table 6.1-1 NOTE 3 states that {@code affinityOrAntiAffinityGroupId} maps to an
      * {@code AffinityRule} or {@code AntiAffinityRule} policy, but not what the group id is.
      */
-    static String affinityGroupId(PolicyDefinition definition) {
+    public static String affinityGroupId(PolicyDefinition definition) {
         return definition.name();
     }
 
@@ -120,7 +120,7 @@ final class VnfdUtils {
      * <p>IFA011 makes it 0..1 - "shall be present if there is the need to reference this script
      * from another information element" - and says nothing about its form.
      */
-    static String lcmScriptId(String interfaceName, String operationName) {
+    public static String lcmScriptId(String interfaceName, String operationName) {
         return interfaceName + "." + operationName;
     }
 
@@ -128,11 +128,11 @@ final class VnfdUtils {
     // NULL-COALESCING
     // ============================================================================================
 
-    static Optional<String> first(List<String> values) {
+    public static Optional<String> first(List<String> values) {
         return values == null || values.isEmpty() ? Optional.empty() : Optional.of(values.get(0));
     }
 
-    static List<String> orEmpty(List<String> values) {
+    public static List<String> orEmpty(List<String> values) {
         return values == null ? Collections.emptyList() : values;
     }
 
@@ -141,7 +141,7 @@ final class VnfdUtils {
     // ============================================================================================
 
     /** The package-root-relative path of an artifact, falling back to the reference as written. */
-    static String pathOf(ArtifactDefinition artifact) {
+    public static String pathOf(ArtifactDefinition artifact) {
         return artifact.resolvedFile().orElse(artifact.file());
     }
 
@@ -156,7 +156,7 @@ final class VnfdUtils {
      * <p>Matching walks {@code derived_from} like everything else, so a vendor artifact type
      * derived from an ETSI one is still found.
      */
-    static List<ArtifactDefinition> artifactsOfType(TypeReader.Hierarchy hierarchy, NfvNode node,
+    public static List<ArtifactDefinition> artifactsOfType(TypeReader.Hierarchy hierarchy, NfvNode node,
             String etsiArtifactType) {
         Map<String, ArtifactDefinition> declared = node.getArtifacts();
         if (declared == null || declared.isEmpty()) {
@@ -177,7 +177,7 @@ final class VnfdUtils {
      * <p>More than one is a rule violation, not a parse failure, so the first is returned and the
      * caller checks {@link #artifactsOfType} when it needs to report the cardinality.
      */
-    static Optional<ArtifactDefinition> artifactOfType(TypeReader.Hierarchy hierarchy, NfvNode node,
+    public static Optional<ArtifactDefinition> artifactOfType(TypeReader.Hierarchy hierarchy, NfvNode node,
             String etsiArtifactType) {
         List<ArtifactDefinition> all = artifactsOfType(hierarchy, node, etsiArtifactType);
         return all.isEmpty() ? Optional.empty() : Optional.of(all.get(0));
@@ -205,7 +205,7 @@ final class VnfdUtils {
  * <p>Note 10 is stated per VDU, and nothing requires the VDUs of one flavour to agree - so one
  * flavour may legitimately hold both kinds.
  */
-    static LcmRealizationPath lcmRealizationPath(VduOsContainerDeployableUnit vdu,
+    public static LcmRealizationPath lcmRealizationPath(VduOsContainerDeployableUnit vdu,
             List<String> associatedMciops) {
         if (!associatedMciops.isEmpty()) {
             return LcmRealizationPath.MCIOP_CISM;
@@ -213,7 +213,7 @@ final class VnfdUtils {
         if (!containerTargets(vdu).isEmpty()) {
             return LcmRealizationPath.DIRECT_MCIO_CISM;
         }
-        // Neither, which SpecRules reports as C2; the path itself is simply not derivable.
+        // Neither, which SpecRuleValidator reports as C2; the path itself is simply not derivable.
         return LcmRealizationPath.UNDETERMINED;
     }
 
