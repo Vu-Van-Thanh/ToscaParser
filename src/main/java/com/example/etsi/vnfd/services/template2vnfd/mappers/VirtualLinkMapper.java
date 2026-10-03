@@ -25,7 +25,7 @@ public final class VirtualLinkMapper implements NodeMapper<VnfVirtualLink, VnfVi
 
     @Override
     public String id(VnfVirtualLink node) {
-        return VnfdUtils.virtualLinkDescId(node);
+        return VnfdUtils.nodeId(node);
     }
 
     @Override
@@ -36,7 +36,7 @@ public final class VirtualLinkMapper implements NodeMapper<VnfVirtualLink, VnfVi
     @Override
     public VnfVirtualLinkDesc map(VnfVirtualLink node, FlavourContext context) {
         VnfVirtualLinkDesc.Builder builder =
-                VnfVirtualLinkDesc.builder(VnfdUtils.virtualLinkDescId(node));
+                VnfVirtualLinkDesc.builder(VnfdUtils.nodeId(node));
         VnfVirtualLink.Properties p = node.getProperties();
         if (p != null) {
             builder.description(p.getDescription());

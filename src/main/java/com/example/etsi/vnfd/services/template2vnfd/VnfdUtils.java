@@ -31,71 +31,18 @@ public final class VnfdUtils {
     // ============================================================================================
 
     /**
-     * [VERIFIED] SOL001 V5.4.1 clause 6.8.12.6: the node template name of a
-     * {@code Vdu.OsContainer} "fulfils the purpose of the 'id' attribute of the SwImageDesc
-     * information element and hence it will be used in APIs to identify the software image id from
-     * the VNFD perspective".
-     */
-    public static String swImageDescId(NfvNode owningNode) {
-        return owningNode.getKey();
-    }
-
-    /** [ASSUMPTION] The node template name. SOL001 states the rule only for SwImageDesc. */
-    public static String vduId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /** [ASSUMPTION] As above. */
-    public static String osContainerDescId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /** [ASSUMPTION] As above. */
-    public static String virtualStorageDescId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /** [ASSUMPTION] As above. */
-    public static String cpdId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /**
-     * {@code CertificateDesc.id}, IFA011 clause 7.1.19.2.2 - M,1.
+     * The identifier of every information element this library derives from a node: SwImageDesc,
+     * Vdu, OsContainerDesc, VirtualStorageDesc, every Cpd, CertificateDesc, DeployableModule,
+     * VnfVirtualLinkDesc, MciopProfile/mciopId - all of them the node template name.
      *
-     * <p>[ASSUMPTION] The node template name. SOL001 clause 6.8.19 does not say how the identifier
-     * is derived; the only place SOL001 states that rule outright is clause 6.8.12.6, for
-     * SwImageDesc.
+     * <p>[VERIFIED] for SwImageDesc only: SOL001 V5.4.1 clause 6.8.12.6 says the node template name
+     * of a {@code Vdu.OsContainer} "fulfils the purpose of the 'id' attribute of the SwImageDesc
+     * information element". For every other element [ASSUMPTION]: SOL001 never states the rule
+     * again, but gives no other stable handle either. Note {@code DeployableModule}'s identifier
+     * also has to agree with whatever {@code VduProfile.deployableModule} names, since that is the
+     * reference IFA011 uses to attach a VDU to a module.
      */
-    public static String certificateDescId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /**
-     * {@code DeployableModule.deployableModuleId}, IFA011 clause 7.1.8.24.2 - M,1.
-     *
-     * <p>[ASSUMPTION] The node template name, for the same reason as above. Note the identifier has
-     * to agree with whatever {@code VduProfile.deployableModule} names, since that is the reference
-     * IFA011 uses to attach a VDU to a module.
-     */
-    public static String deployableModuleId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /** [ASSUMPTION] As above. */
-    public static String virtualLinkDescId(NfvNode node) {
-        return node.getKey();
-    }
-
-    /**
-     * [ASSUMPTION] The node template name.
-     *
-     * <p>IFA011 V5.4.1 clause 7.1.8.20.2 says {@code mciopId} "identifies the MCIOP in the VNF
-     * package" without saying how. The node template name is the only stable handle a descriptor
-     * offers, and SOL001 Table 6.1-1 NOTE 3 maps {@code associatedVdu} and {@code deploymentOrder}
-     * onto this node type, so the profile is built around it either way.
-     */
-    public static String mciopId(NfvNode node) {
+    public static String nodeId(NfvNode node) {
         return node.getKey();
     }
 

@@ -22,7 +22,7 @@ final class VduCpdMapper extends CpdMapper<VduCp, VduCpd> {
 
     @Override
     public VduCpd map(VduCp node, FlavourContext context) {
-        VduCpd.Builder builder = VduCpd.builder(VnfdUtils.cpdId(node));
+        VduCpd.Builder builder = VduCpd.builder(VnfdUtils.nodeId(node));
         applyCommon(node, builder);
         if (node.getRequirements() != null) {
             VnfdUtils.first(node.getRequirements().getVirtualBinding())

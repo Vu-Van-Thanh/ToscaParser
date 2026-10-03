@@ -23,7 +23,7 @@ public final class VnfExtCpdMapper {
 
     /** SOL001 clause 6.8.2 VnfExtCp, declared explicitly. */
     public static VnfExtCpd fromNode(VnfExtCp node) {
-        VnfExtCpd.Builder builder = VnfExtCpd.builder(VnfdUtils.cpdId(node));
+        VnfExtCpd.Builder builder = VnfExtCpd.builder(VnfdUtils.nodeId(node));
         CpdMapper.applyCommon(node, builder);
         if (node.getRequirements() != null) {
             // SOL001 Table 6.8.2.4-1 names them internal_virtual_link and external_virtual_link;
@@ -42,9 +42,9 @@ public final class VnfExtCpdMapper {
      * external one stands for, which is what lets a consumer follow it down to its VDU.
      */
     public static VnfExtCpd fromExposed(Cp node) {
-        VnfExtCpd.Builder builder = VnfExtCpd.builder(VnfdUtils.cpdId(node));
+        VnfExtCpd.Builder builder = VnfExtCpd.builder(VnfdUtils.nodeId(node));
         CpdMapper.applyCommon(node, builder);
-        builder.intCpd(VnfdUtils.cpdId(node));
+        builder.intCpd(VnfdUtils.nodeId(node));
         builder.exposedThroughSubstitution(true);
         if (node instanceof VduCp && ((VduCp) node).getRequirements() != null) {
             VnfdUtils.first(((VduCp) node).getRequirements().getVirtualLink())

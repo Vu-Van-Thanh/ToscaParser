@@ -54,7 +54,7 @@ public final class StorageMapper {
     private static VirtualStorageDesc build(NfvNode node, TypeOfStorage type,
             Object storageData, PropertyValue<Boolean> perVnfcInstance, Object maintenance) {
         VirtualStorageDesc.Builder builder =
-                VirtualStorageDesc.builder(VnfdUtils.virtualStorageDescId(node), type);
+                VirtualStorageDesc.builder(VnfdUtils.nodeId(node), type);
         if (storageData != null) {
             builder.storageData(PlainValues.asMap(storageData));
         }

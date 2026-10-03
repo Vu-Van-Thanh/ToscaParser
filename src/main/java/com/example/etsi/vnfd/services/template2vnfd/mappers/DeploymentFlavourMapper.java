@@ -56,7 +56,7 @@ public final class DeploymentFlavourMapper {
 
         Map<String, Integer> minInstances = new LinkedHashMap<>();
         for (VduOsContainerDeployableUnit vdu : context.vdus()) {
-            VduProfile profile = vduProfile(vdu, affinity);
+            VduProfile profile = vduProfile(vdu, context, affinity);
             builder.addVduProfile(profile);
             profile.getMinNumberOfInstances().flatMap(v -> v.resolved())
                     .ifPresent(min -> minInstances.put(profile.getVduId(), min));
@@ -107,7 +107,7 @@ public final class DeploymentFlavourMapper {
         PolicyMapper.securityGroupRules(context).forEach(merged::addSecurityGroupRule);
         PolicyMapper.packageChanges(context).forEach(merged::addVnfPackageChangeInfo);
         for (Mciop mciop : context.mciops()) {
-            merged.addMciopId(VnfdUtils.mciopId(mciop));
+            merged.addMciopId(VnfdUtils.nodeId(mciop));
             MciopMapper.mapScript(mciop, context).ifPresent(merged::addLcmOpParameterMappingScript);
             MciopMapper.mapArtifacts(mciop, context).ifPresent(merged::addMciopArtifacts);
         }
@@ -202,7 +202,7 @@ public final class DeploymentFlavourMapper {
     private static VirtualLinkProfile virtualLinkProfile(VnfVirtualLink link,
             PolicyMapper.AffinityAssignment affinity) {
         VirtualLinkProfile.Builder builder =
-                VirtualLinkProfile.builder(VnfdUtils.virtualLinkDescId(link));
+                VirtualLinkProfile.builder(VnfdUtils.nodeId(link));
         if (link.getProperties() != null && link.getProperties().getVlProfile() != null) {
             com.example.etsi.vnfd.toscatype.data.VlProfile p = link.getProperties().getVlProfile();
             builder.maxBitrateRequirements(PlainValues.asMap(p.getMaxBitrateRequirements()))
@@ -216,9 +216,9 @@ public final class DeploymentFlavourMapper {
     }
 
     /** SOL001 Table 6.8.13.2-1 {@code vdu_profile} to IFA011 clause 7.1.8.3 {@code VduProfile}. */
-    private static VduProfile vduProfile(VduOsContainerDeployableUnit vdu,
+    private static VduProfile vduProfile(VduOsContainerDeployableUnit vdu, FlavourContext context,
             PolicyMapper.AffinityAssignment affinity) {
-        VduProfile.Builder builder = VduProfile.builder(VnfdUtils.vduId(vdu));
+        VduProfile.Builder builder = VduProfile.builder(VnfdUtils.nodeId(vdu));
         if (vdu.getProperties() != null && vdu.getProperties().getVduProfile() != null) {
             com.example.etsi.vnfd.toscatype.data.VduProfile p = vdu.getProperties().getVduProfile();
             builder.minNumberOfInstances(p.getMinNumberOfInstances())
@@ -227,6 +227,9 @@ public final class DeploymentFlavourMapper {
                     .forEach(builder::addModifyCapacityAttributesOp);
         }
         affinity.groupsOf(vdu.getKey()).forEach(builder::addAffinityGroup);
+        // SOL001 clause 6.8.16: a DeployableModule names its members, so the VDU-to-module direction
+        // IFA011 clause 7.1.8.3.2 wants is read back out of FlavourContext's reverse index.
+        context.deployableModulesOf(vdu.getKey()).forEach(builder::addDeployableModule);
         return builder.build();
     }
 }

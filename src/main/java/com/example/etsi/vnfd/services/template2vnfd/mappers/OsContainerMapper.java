@@ -25,7 +25,7 @@ public final class OsContainerMapper implements NodeMapper<VduOsContainer, OsCon
 
     @Override
     public String id(VduOsContainer node) {
-        return VnfdUtils.osContainerDescId(node);
+        return VnfdUtils.nodeId(node);
     }
 
     @Override
@@ -35,7 +35,7 @@ public final class OsContainerMapper implements NodeMapper<VduOsContainer, OsCon
 
     @Override
     public OsContainerDesc map(VduOsContainer node, FlavourContext context) {
-        OsContainerDesc.Builder builder = OsContainerDesc.builder(VnfdUtils.osContainerDescId(node));
+        OsContainerDesc.Builder builder = OsContainerDesc.builder(VnfdUtils.nodeId(node));
 
         VduOsContainer.Properties p = node.getProperties();
         if (p != null) {
@@ -52,7 +52,7 @@ public final class OsContainerMapper implements NodeMapper<VduOsContainer, OsCon
         // IFA011 clause 7.1.6.13.2 makes swImageDesc M,1; SOL001 clause 6.8.12.6 requires the
         // artifact and caps it at one. The id is the node template name, not the artifact name.
         if (context.artifactOfType(node, EtsiTypes.ARTIFACT_SW_IMAGE).isPresent()) {
-            builder.swImageDesc(VnfdUtils.swImageDescId(node));
+            builder.swImageDesc(VnfdUtils.nodeId(node));
         }
 
         return builder.build();

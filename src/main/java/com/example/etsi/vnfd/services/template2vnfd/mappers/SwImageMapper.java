@@ -28,7 +28,7 @@ public final class SwImageMapper {
                 Collections.singletonMap("properties", definition.properties()),
                 SwImage.class).getProperties();
 
-        SwImageDesc.Builder builder = SwImageDesc.builder(VnfdUtils.swImageDescId(owner));
+        SwImageDesc.Builder builder = SwImageDesc.builder(VnfdUtils.nodeId(owner));
         if (p != null) {
             builder.name(p.getName())
                    .version(p.getVersion())

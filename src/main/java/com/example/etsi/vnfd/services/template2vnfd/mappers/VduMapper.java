@@ -35,7 +35,7 @@ public final class VduMapper implements NodeMapper<VduOsContainerDeployableUnit,
 
     @Override
     public String id(VduOsContainerDeployableUnit node) {
-        return VnfdUtils.vduId(node);
+        return VnfdUtils.nodeId(node);
     }
 
     @Override
@@ -45,7 +45,7 @@ public final class VduMapper implements NodeMapper<VduOsContainerDeployableUnit,
 
     @Override
     public Vdu map(VduOsContainerDeployableUnit node, FlavourContext context) {
-        Vdu.Builder builder = Vdu.builder(VnfdUtils.vduId(node));
+        Vdu.Builder builder = Vdu.builder(VnfdUtils.nodeId(node));
 
         VduOsContainerDeployableUnit.Properties p = node.getProperties();
         if (p != null) {
@@ -109,7 +109,7 @@ public final class VduMapper implements NodeMapper<VduOsContainerDeployableUnit,
             }
             VduSubCp.Properties p = sub.getProperties();
             byParent.computeIfAbsent(parent, k -> new ArrayList<>())
-                    .add(Subport.of(VnfdUtils.cpdId(sub),
+                    .add(Subport.of(VnfdUtils.nodeId(sub),
                             p == null ? null : p.getSegmentationType(),
                             p == null ? null : p.getSegmentationId()));
         }

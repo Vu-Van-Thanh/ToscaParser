@@ -26,7 +26,7 @@ final class VirtualCpdMapper extends CpdMapper<VirtualCp, VirtualCpd> {
 
     @Override
     public VirtualCpd map(VirtualCp node, FlavourContext context) {
-        VirtualCpd.Builder builder = VirtualCpd.builder(VnfdUtils.cpdId(node));
+        VirtualCpd.Builder builder = VirtualCpd.builder(VnfdUtils.nodeId(node));
         applyCommon(node, builder);
 
         VirtualCp.Properties p = node.getProperties();

@@ -76,7 +76,7 @@ final class FlavourProcessor {
         for (VduOsContainer container : context.containers().values()) {
             SpecRuleValidator.swImage(container, context);
             context.artifactOfType(container, EtsiTypes.ARTIFACT_SW_IMAGE).ifPresent(image ->
-                    pool.addSwImageDesc(VnfdUtils.swImageDescId(container),
+                    pool.addSwImageDesc(VnfdUtils.nodeId(container),
                             SwImageMapper.map(image, container)));
         }
     }
@@ -90,9 +90,9 @@ final class FlavourProcessor {
     private static void collectVnfExtCpds(FlavourContext context, VnfdElements pool) {
         for (Cp cp : context.connectionPoints().values()) {
             if (cp instanceof VnfExtCp) {
-                pool.addVnfExtCpd(VnfdUtils.cpdId(cp), VnfExtCpdMapper.fromNode((VnfExtCp) cp));
+                pool.addVnfExtCpd(VnfdUtils.nodeId(cp), VnfExtCpdMapper.fromNode((VnfExtCp) cp));
             } else if (context.isExternallyExposed(cp.getKey())) {
-                pool.addVnfExtCpd(VnfdUtils.cpdId(cp), VnfExtCpdMapper.fromExposed(cp));
+                pool.addVnfExtCpd(VnfdUtils.nodeId(cp), VnfExtCpdMapper.fromExposed(cp));
             }
         }
     }
@@ -119,7 +119,7 @@ final class FlavourProcessor {
     private static List<Vdu> flavourVdus(FlavourContext context, VnfdElements pool) {
         List<Vdu> out = new ArrayList<>();
         for (VduOsContainerDeployableUnit vdu : context.vdus()) {
-            out.add(pool.vdu(VnfdUtils.vduId(vdu)));
+            out.add(pool.vdu(VnfdUtils.nodeId(vdu)));
         }
         return out;
     }

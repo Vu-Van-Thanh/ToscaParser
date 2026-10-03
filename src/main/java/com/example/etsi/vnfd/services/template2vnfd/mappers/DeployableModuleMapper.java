@@ -16,7 +16,7 @@ public final class DeployableModuleMapper {
     public static DeployableModule map(
             com.example.etsi.vnfd.toscatype.node.DeployableModule node) {
         DeployableModule.Builder builder =
-                DeployableModule.builder(VnfdUtils.deployableModuleId(node));
+                DeployableModule.builder(VnfdUtils.nodeId(node));
         com.example.etsi.vnfd.toscatype.node.DeployableModule.Properties p = node.getProperties();
         if (p != null) {
             builder.name(p.getName()).description(p.getDescription());

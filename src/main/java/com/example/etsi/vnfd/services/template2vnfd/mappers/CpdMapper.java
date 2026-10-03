@@ -1,9 +1,9 @@
 package com.example.etsi.vnfd.services.template2vnfd.mappers;
 
 import com.example.etsi.vnfd.model.Cpd;
+import com.example.etsi.vnfd.toscatype.data.CpProtocolData;
 import com.example.etsi.vnfd.toscatype.node.Cp;
 import com.example.etsi.vnfd.services.template2vnfd.VnfdUtils;
-import java.util.Collections;
 
 /**
  * What every connection point descriptor shares - IFA011 V5.4.1 clause 7.1.6.3 {@code Cpd}.
@@ -20,7 +20,7 @@ abstract class CpdMapper<N extends Cp, E> implements NodeMapper<N, E> {
     /** [ASSUMPTION] The node template name - see {@code VnfdUtils.cpdId}. */
     @Override
     public String id(N node) {
-        return VnfdUtils.cpdId(node);
+        return VnfdUtils.nodeId(node);
     }
 
     /** The attributes of {@code Cpd}, which every connection point descriptor inherits. */
@@ -34,10 +34,9 @@ abstract class CpdMapper<N extends Cp, E> implements NodeMapper<N, E> {
         builder.description(p.getDescription());
         builder.trunkMode(p.getTrunkMode());
         if (p.getProtocol() != null) {
-            for (Object protocol : p.getProtocol()) {
-                builder.addProtocol(java.util.Collections.singletonMap("protocol", protocol));
+            for (CpProtocolData protocol : p.getProtocol()) {
+                builder.addProtocol(PlainValues.asMap(protocol));
             }
         }
-    
     }
 }

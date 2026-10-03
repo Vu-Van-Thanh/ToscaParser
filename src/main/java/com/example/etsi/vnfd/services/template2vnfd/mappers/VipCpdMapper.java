@@ -24,7 +24,7 @@ final class VipCpdMapper extends CpdMapper<VipCp, VipCpd> {
 
     @Override
     public VipCpd map(VipCp node, FlavourContext context) {
-        VipCpd.Builder builder = VipCpd.builder(VnfdUtils.cpdId(node));
+        VipCpd.Builder builder = VipCpd.builder(VnfdUtils.nodeId(node));
         applyCommon(node, builder);
 
         VipCp.Properties p = node.getProperties();

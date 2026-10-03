@@ -55,6 +55,7 @@ public final class FlavourContext {
 
     private final Map<String, List<String>> cpsByVdu = new LinkedHashMap<>();
     private final Map<String, List<String>> mciopsByVdu = new LinkedHashMap<>();
+    private final Map<String, List<String>> deployableModulesByVdu = new LinkedHashMap<>();
     private final Set<String> externallyExposedCps = new LinkedHashSet<>();
 
     FlavourContext(ToscaDescriptorTemplate template, NodeBinder binder,
@@ -138,6 +139,7 @@ public final class FlavourContext {
     private void collectVduRelations() {
         collectCpsByVdu();
         collectMciopsByVdu();
+        collectDeployableModulesByVdu();
         collectExposedCps();
     }
 
@@ -161,6 +163,43 @@ public final class FlavourContext {
                 mciopsByVdu.computeIfAbsent(vdu, key -> new ArrayList<>()).add(mciop.getKey());
             }
         }
+    }
+
+    /**
+     * A DeployableModule names its members (SOL001 clause 6.8.16), and a member is either a VDU
+     * directly or an Mciop - both declare the {@code DeployableModuleMember} capability, and nothing
+     * in the type definitions picks one over the other. An Mciop member stands for the VDUs it
+     * associates with, so the module applies to each of them.
+     *
+     * <p>IFA011 clause 7.1.8.24.1: a VDU named by no module is instantiated unconditionally; one
+     * named by a module is only instantiated if that module is selected. This index is what lets
+     * {@code VduProfile.deployableModule} (clause 7.1.8.3.2) make that distinction.
+     */
+    private void collectDeployableModulesByVdu() {
+        for (DeployableModule module : nodesOf(DeployableModule.class)) {
+            if (module.getRequirements() == null) {
+                continue;
+            }
+            String moduleId = VnfdUtils.nodeId(module);
+            for (String memberKey : VnfdUtils.orEmpty(module.getRequirements().getMember())) {
+                NfvNode member = nodes.get(memberKey);
+                if (member instanceof VduOsContainerDeployableUnit) {
+                    addDeployableModuleFor(memberKey, moduleId);
+                } else if (member instanceof Mciop) {
+                    Mciop mciop = (Mciop) member;
+                    if (mciop.getRequirements() != null) {
+                        for (String vduKey
+                                : VnfdUtils.orEmpty(mciop.getRequirements().getAssociatedVdu())) {
+                            addDeployableModuleFor(vduKey, moduleId);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void addDeployableModuleFor(String vduKey, String moduleId) {
+        deployableModulesByVdu.computeIfAbsent(vduKey, key -> new ArrayList<>()).add(moduleId);
     }
 
     /** SOL001 clause 6.8.2.8: substitution_mappings can expose a VduCp as an external CP. */
@@ -247,6 +286,11 @@ public final class FlavourContext {
     /** Drives {@code lcmRealizationPath} and the MCIOP coverage check. */
     public List<String> mciopsAssociatedTo(String vduKey) {
         return mciopsByVdu.getOrDefault(vduKey, Collections.emptyList());
+    }
+
+    /** {@code VduProfile.deployableModule} (IFA011 clause 7.1.8.3.2): the modules this VDU is a member of. */
+    public List<String> deployableModulesOf(String vduKey) {
+        return deployableModulesByVdu.getOrDefault(vduKey, Collections.emptyList());
     }
 
     /**

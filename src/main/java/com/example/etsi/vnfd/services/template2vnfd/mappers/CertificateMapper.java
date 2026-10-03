@@ -23,7 +23,7 @@ public final class CertificateMapper implements NodeMapper<Certificate, Certific
 
     @Override
     public String id(Certificate node) {
-        return VnfdUtils.certificateDescId(node);
+        return VnfdUtils.nodeId(node);
     }
 
     @Override
@@ -34,7 +34,7 @@ public final class CertificateMapper implements NodeMapper<Certificate, Certific
     @Override
     public CertificateDesc map(Certificate node, FlavourContext context) {
         CertificateDesc.Builder builder =
-                CertificateDesc.builder(VnfdUtils.certificateDescId(node));
+                CertificateDesc.builder(VnfdUtils.nodeId(node));
         Certificate.Properties p = node.getProperties();
         if (p != null) {
             builder.name(p.getName()).certificateType(p.getCertificateType());

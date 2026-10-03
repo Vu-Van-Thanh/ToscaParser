@@ -53,7 +53,7 @@ public final class MciopMapper {
 
     public static MciopProfile mapProfile(Mciop node, Map<String, Integer> deploymentOrder,
             FlavourContext context) {
-        MciopProfile.Builder builder = MciopProfile.builder(VnfdUtils.mciopId(node));
+        MciopProfile.Builder builder = MciopProfile.builder(VnfdUtils.nodeId(node));
         Integer order = deploymentOrder.get(node.getKey());
         if (order != null) {
             builder.deploymentOrder(order);
@@ -179,7 +179,7 @@ public final class MciopMapper {
         if (!chart.isPresent() && !script.isPresent() && !rule.isPresent()) {
             return Optional.empty();
         }
-        MciopArtifacts.Builder builder = MciopArtifacts.builder(VnfdUtils.mciopId(node));
+        MciopArtifacts.Builder builder = MciopArtifacts.builder(VnfdUtils.nodeId(node));
         chart.ifPresent(c -> builder.packagePath(VnfdUtils.pathOf(c))
                 .packageArtifactName(c.name())
                 .packageArtifactType(c.type()));
