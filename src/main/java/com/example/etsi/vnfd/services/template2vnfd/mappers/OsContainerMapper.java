@@ -47,6 +47,17 @@ public final class OsContainerMapper implements NodeMapper<VduOsContainer, OsCon
                    .memoryResourceLimit(p.getMemoryResourceLimit())
                    .requestedEphemeralStorageResources(p.getRequestedEphemeralStorageResources())
                    .ephemeralStorageResourceLimit(p.getEphemeralStorageResourceLimit());
+            if (p.getExtendedResourceRequests() != null) {
+                p.getExtendedResourceRequests()
+                        .forEach(r -> builder.addExtendedResourceRequest(PlainValues.asMap(r)));
+            }
+            if (p.getHugePagesResources() != null) {
+                p.getHugePagesResources()
+                        .forEach(h -> builder.addHugePageResource(PlainValues.asMap(h)));
+            }
+            if (p.getCpuPinningRequirements() != null) {
+                builder.cpuPinningRequirements(PlainValues.asMap(p.getCpuPinningRequirements()));
+            }
         }
 
         // IFA011 clause 7.1.6.13.2 makes swImageDesc M,1; SOL001 clause 6.8.12.6 requires the

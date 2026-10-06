@@ -41,6 +41,11 @@ public final class VnfHeaderMapper {
         VnfdUtils.orEmpty(p.getVnfmInfo()).forEach(builder::addVnfmInfo);
         VnfdUtils.orEmpty(p.getLocalizationLanguages())
                 .forEach(builder::addLocalizationLanguage);
+
+        // IFA011 clause 7.1.12 VnfConfigurableProperties.
+        if (p.getConfigurableProperties() != null) {
+            builder.configurableProperties(PlainValues.asMap(p.getConfigurableProperties()));
+        }
     }
 
     private static void literal(PropertyValue<String> value, Consumer<String> sink) {

@@ -30,7 +30,16 @@ final class VduCpdMapper extends CpdMapper<VduCp, VduCpd> {
             VnfdUtils.first(node.getRequirements().getVirtualLink())
                     .ifPresent(builder::intVirtualLinkDesc);
         }
+        VduCp.Properties p = node.getProperties();
+        if (p != null) {
+            builder.bitrateRequirement(p.getBitrateRequirement())
+                   .order(p.getOrder())
+                   .vnicType(p.getVnicType());
+            if (p.getVirtualNetworkInterfaceRequirements() != null) {
+                p.getVirtualNetworkInterfaceRequirements().forEach(r ->
+                        builder.addVirtualNetworkInterfaceRequirement(PlainValues.asMap(r)));
+            }
+        }
         return builder.build();
-    
     }
 }

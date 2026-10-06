@@ -1,7 +1,9 @@
 package com.example.etsi.vnfd.model;
 
 import com.example.etsi.vnfd.template.value.PropertyValue;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -18,12 +20,14 @@ public final class VnfVirtualLinkDesc {
     private final String virtualLinkDescId;
     private final Map<String, Object> connectivityType;
     private final PropertyValue<String> description;
+    private final List<String> testAccess;
     private final Map<String, Object> nfviMaintenanceInfo;
 
     private VnfVirtualLinkDesc(Builder builder) {
         this.virtualLinkDescId = Objects.requireNonNull(builder.virtualLinkDescId, "virtualLinkDescId");
         this.connectivityType = builder.connectivityType;
         this.description = builder.description;
+        this.testAccess = Collections.unmodifiableList(new ArrayList<>(builder.testAccess));
         this.nfviMaintenanceInfo = builder.nfviMaintenanceInfo;
     }
 
@@ -45,6 +49,11 @@ public final class VnfVirtualLinkDesc {
         return Optional.ofNullable(description);
     }
 
+    /** Test access facilities available on the link, e.g. passive_monitoring, active_loopback. */
+    public List<String> getTestAccess() {
+        return testAccess;
+    }
+
     public Map<String, Object> getNfviMaintenanceInfo() {
         return nfviMaintenanceInfo == null ? Collections.emptyMap() : nfviMaintenanceInfo;
     }
@@ -59,6 +68,7 @@ public final class VnfVirtualLinkDesc {
         private final String virtualLinkDescId;
         private Map<String, Object> connectivityType;
         private PropertyValue<String> description;
+        private final List<String> testAccess = new ArrayList<>();
         private Map<String, Object> nfviMaintenanceInfo;
 
         private Builder(String virtualLinkDescId) {
@@ -72,6 +82,11 @@ public final class VnfVirtualLinkDesc {
 
         public Builder description(PropertyValue<String> value) {
             this.description = value;
+            return this;
+        }
+
+        public Builder addTestAccess(String value) {
+            this.testAccess.add(value);
             return this;
         }
 

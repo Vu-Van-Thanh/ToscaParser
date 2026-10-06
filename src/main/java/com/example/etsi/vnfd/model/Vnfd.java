@@ -4,6 +4,7 @@ import com.example.etsi.vnfd.model.ext.VnfdExtensions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -36,6 +37,7 @@ public final class Vnfd {
     private final List<String> vnfmInfo;
     private final List<String> localizationLanguage;
     private final String defaultLocalizationLanguage;
+    private final Map<String, Object> configurableProperties;
     private final List<Vdu> vdu;
     private final List<OsContainerDesc> osContainerDesc;
     private final List<VirtualStorageDesc> virtualStorageDesc;
@@ -66,6 +68,7 @@ public final class Vnfd {
         this.vnfmInfo = Collections.unmodifiableList(new ArrayList<>(b.vnfmInfo));
         this.localizationLanguage = Collections.unmodifiableList(new ArrayList<>(b.localizationLanguage));
         this.defaultLocalizationLanguage = b.defaultLocalizationLanguage;
+        this.configurableProperties = b.configurableProperties;
         this.vdu = Collections.unmodifiableList(new ArrayList<>(b.vdu));
         this.osContainerDesc = Collections.unmodifiableList(new ArrayList<>(b.osContainerDesc));
         this.virtualStorageDesc = Collections.unmodifiableList(new ArrayList<>(b.virtualStorageDesc));
@@ -138,6 +141,16 @@ public final class Vnfd {
 
     public Optional<String> getDefaultLocalizationLanguage() {
         return Optional.ofNullable(defaultLocalizationLanguage);
+    }
+
+    /**
+     * IFA011 V5.4.1 clause 7.1.12 {@code VnfConfigurableProperties} - carried as a plain map rather
+     * than modelled attribute by attribute, the same choice made for
+     * {@code VnfDf.vnfLcmOperationsConfiguration}: the sub-types nest several levels deep, and
+     * nothing downstream reads an individual one.
+     */
+    public Map<String, Object> getConfigurableProperties() {
+        return configurableProperties == null ? Collections.emptyMap() : configurableProperties;
     }
 
     /** Mandatory, 1..N. */
@@ -255,6 +268,7 @@ public final class Vnfd {
         private String vnfProductInfoDescription;
         private String vnfdExtInvariantId;
         private String defaultLocalizationLanguage;
+        private Map<String, Object> configurableProperties;
         private final List<String> vnfmInfo = new ArrayList<>();
         private final List<String> localizationLanguage = new ArrayList<>();
         private final List<Vdu> vdu = new ArrayList<>();
@@ -320,6 +334,11 @@ public final class Vnfd {
 
         public Builder defaultLocalizationLanguage(String value) {
             this.defaultLocalizationLanguage = value;
+            return this;
+        }
+
+        public Builder configurableProperties(Map<String, Object> value) {
+            this.configurableProperties = value;
             return this;
         }
 

@@ -40,6 +40,13 @@ public final class VirtualLinkMapper implements NodeMapper<VnfVirtualLink, VnfVi
         VnfVirtualLink.Properties p = node.getProperties();
         if (p != null) {
             builder.description(p.getDescription());
+            if (p.getConnectivityType() != null) {
+                builder.connectivityType(PlainValues.asMap(p.getConnectivityType()));
+            }
+            if (p.getNfviMaintenanceInfo() != null) {
+                builder.nfviMaintenanceInfo(PlainValues.asMap(p.getNfviMaintenanceInfo()));
+            }
+            VnfdUtils.orEmpty(p.getTestAccess()).forEach(builder::addTestAccess);
         }
         return builder.build();
     }
